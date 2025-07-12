@@ -1,0 +1,13 @@
+@import "tailwindcss";
+
+a.active hr{
+    display: block;
+}
+
+@theme{
+    --color-skylight:#b8e6fd
+}
+
+::-webkit-scrollbar{
+  display: none;
+}
