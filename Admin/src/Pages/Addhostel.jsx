@@ -1,9 +1,11 @@
-import React, { useState } from 'react';
+import React, { useContext, useState } from 'react';
 import { toast } from 'react-toastify';
-import axios from 'axios';
 import Title from '../Components/Title';
+import { AuthContext } from '../Context/authcontext';
 
 const Addhostel = () => {
+  const { addproduct } = useContext(AuthContext);
+
   const [formData, setFormData] = useState({
     name: '',
     phone: '',
@@ -18,13 +20,11 @@ const Addhostel = () => {
 
   const [images, setImages] = useState([null, null, null, null]);
   const [preview, setPreview] = useState([null, null, null, null]);
+  const [loading, setLoading] = useState(false);
 
   const handleChange = (e) => {
     const { name, value } = e.target;
-    setFormData(prev => ({
-      ...prev,
-      [name]: value,
-    }));
+    setFormData(prev => ({ ...prev, [name]: value }));
   };
 
   const handleImageChange = (e, index) => {
@@ -50,20 +50,19 @@ const Addhostel = () => {
     }
 
     const payload = new FormData();
-    Object.keys(formData).forEach(key => {
-      payload.append(key, formData[key]);
+    Object.entries(formData).forEach(([key, value]) => {
+      payload.append(key, value);
     });
 
     images.forEach((img, i) => {
-      payload.append('images', img); // Assuming backend expects 'images' as array
+      payload.append(`image${i + 1}`, img);
     });
 
     try {
-      const res = await axios.post('/api/hostels/add', payload, {
-        headers: { 'Content-Type': 'multipart/form-data' },
-      });
+      setLoading(true);
+      const res = await addproduct(payload);
 
-      if (res.data.success) {
+      if (res?.data?.success) {
         toast.success('Hostel added successfully!');
         setFormData({
           name: '',
@@ -79,10 +78,13 @@ const Addhostel = () => {
         setImages([null, null, null, null]);
         setPreview([null, null, null, null]);
       } else {
-        toast.error(res.data.mssg || 'Error adding hostel');
+        toast.error(res?.data?.mssg || 'Error adding hostel');
       }
     } catch (err) {
-      toast.error(err.message || 'Failed to add hostel');
+      console.error(err);
+      toast.error(err.response?.data?.mssg || err.message || 'Failed to add hostel');
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -91,23 +93,54 @@ const Addhostel = () => {
       onSubmit={handleSubmit}
       className="flex flex-col w-full max-w-4xl mx-auto p-6 gap-6 bg-white shadow-md rounded-lg"
     >
-     <div className='text-2xl'>
-        <Title  text1={"Add"} text2={"Hostel"}/>
+      <div className="text-2xl">
+        <Title text1="Add" text2="Hostel" />
+      </div>
 
-    </div>
-      {/* Text inputs */}
-      <input type="text" name="name" placeholder="Hostel Name" value={formData.name} onChange={handleChange} className="p-3 rounded border bg-gray-100 text-gray-800" required />
-      <input type="tel" name="phone" placeholder="Phone Number" value={formData.phone} onChange={handleChange} className="p-3 rounded border bg-gray-100 text-gray-800" required />
-      <input type="email" name="email" placeholder="Email" value={formData.email} onChange={handleChange} className="p-3 rounded border bg-gray-100 text-gray-800" required />
-      <input type="text" name="address" placeholder="Address" value={formData.address} onChange={handleChange} className="p-3 rounded border bg-gray-100 text-gray-800" required />
-      <input type="number" name="price" placeholder="Price" value={formData.price} onChange={handleChange} className="p-3 rounded border bg-gray-100 text-gray-800" required />
+      {/* Text Inputs */}
+      {[
+        { type: 'text', name: 'name', placeholder: 'Hostel Name' },
+        { type: 'tel', name: 'phone', placeholder: 'Phone Number' },
+        { type: 'email', name: 'email', placeholder: 'Email' },
+        { type: 'text', name: 'address', placeholder: 'Address' },
+        { type: 'number', name: 'price', placeholder: 'Price' },
+        { type: 'text', name: 'owner', placeholder: 'Owner Name' },
+      ].map(({ type, name, placeholder }) => (
+        <input
+          key={name}
+          type={type}
+          name={name}
+          placeholder={placeholder}
+          value={formData[name]}
+          onChange={handleChange}
+          className="p-3 rounded border bg-gray-100 text-gray-800"
+          required
+        />
+      ))}
+
       <select name="category" value={formData.category} onChange={handleChange} className="p-3 rounded border bg-gray-100 text-gray-800">
         <option value="Boys">Boys</option>
         <option value="Girls">Girls</option>
       </select>
-      <input type="date" name="listedDate" value={formData.listedDate} onChange={handleChange} className="p-3 rounded border bg-gray-100 text-gray-800" required />
-      <input type="text" name="owner" placeholder="Owner Name" value={formData.owner} onChange={handleChange} className="p-3 rounded border bg-gray-100 text-gray-800" required />
-      <textarea name="description" placeholder="Description" value={formData.description} onChange={handleChange} rows="4" className="p-3 rounded border bg-gray-100 text-gray-800" required></textarea>
+
+      <input
+        type="date"
+        name="listedDate"
+        value={formData.listedDate}
+        onChange={handleChange}
+        className="p-3 rounded border bg-gray-100 text-gray-800"
+        required
+      />
+
+      <textarea
+        name="description"
+        placeholder="Description"
+        value={formData.description}
+        onChange={handleChange}
+        rows="4"
+        className="p-3 rounded border bg-gray-100 text-gray-800"
+        required
+      ></textarea>
 
       {/* Image Upload Inputs */}
       <div className="grid grid-cols-2 gap-4">
@@ -128,8 +161,14 @@ const Addhostel = () => {
         ))}
       </div>
 
-      <button type="submit" className="bg-black hover:scale-103 transition-all duration-400 text-white font-semibold py-2 px-6 rounded mt-4">
-        Submit Hostel
+      <button
+        type="submit"
+        disabled={loading}
+        className={`bg-black hover:scale-103 transition-all duration-400 text-white font-semibold py-2 px-6 rounded mt-4 ${
+          loading ? 'opacity-50 cursor-not-allowed' : ''
+        }`}
+      >
+        {loading ? 'Submitting...' : 'Submit Hostel'}
       </button>
     </form>
   );

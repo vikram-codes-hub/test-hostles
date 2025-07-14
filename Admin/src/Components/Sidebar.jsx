@@ -1,10 +1,13 @@
-import React from 'react'
+import React, { useContext } from 'react'
 import { NavLink } from 'react-router-dom'
 import { assets } from '../assets/Hostels'
 import { IoIosAddCircleOutline } from "react-icons/io";
 import { AiOutlineEye } from "react-icons/ai";
 import { CiEdit } from "react-icons/ci";
+import { AuthContext } from '../Context/authcontext';
 const Sidebar = () => {
+
+  const {logout}=useContext(AuthContext)
   return (
     <div className='w-[18%] min-h-screen shadow-2xl bg-gray flex flex-col'>
       <div className='flex flex-col  justify-between'>
@@ -33,7 +36,7 @@ const Sidebar = () => {
      
       <div className='mt-auto flex items-center gap-3 border mb-9 p-2 px-4 border-gray-300 border-r-0 ml-1 rounded-l'>
         
-        <p className='text-black text-sm md:text-[12px] lg:text-lg ml-5 md:ml-10'>Logout</p>
+        <p onClick={logout} className='text-black text-sm md:text-[12px] lg:text-lg ml-5 md:ml-10'>Logout</p>
       </div>
     </div>
   )

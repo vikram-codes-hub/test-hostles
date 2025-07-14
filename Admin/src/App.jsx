@@ -1,32 +1,65 @@
-import React from 'react'
+import React, { useContext } from 'react';
 import { ToastContainer } from 'react-toastify';
-import { Route, Routes } from 'react-router-dom'
+import { Route, Routes, useLocation, Navigate } from 'react-router-dom';
 import Sidebar from './Components/Sidebar';
 import Edithostel from './Pages/Edithostel';
-import Addhostel from './Pages/Addhostel';  
+import Addhostel from './Pages/Addhostel';
 import Viewhostel from './Pages/Viewhostel';
-
 import Login from './Pages/Login';
+import { AuthContext } from './Context/authcontext';
 
 const App = () => {
+  const { token } = useContext(AuthContext);
+  const location = useLocation();
+
+  const isLoginPage = location.pathname === "/adminlogin";
+
+  // Protected Route Wrapper
+  const ProtectedRoute = ({ children }) => {
+    if (!token) return <Navigate to="/adminlogin" replace />;
+    return children;
+  };
+
   return (
-    <div className="h-screen flex overflow-hidden flex text-white">
+    <div className="h-screen flex overflow-hidden text-white">
       <ToastContainer />
 
-      {/* Sidebar */}
-     
- <Sidebar />
+      {/* Sidebar only visible when not on login page AND token is valid */}
+      {!isLoginPage && token && <Sidebar />}
+
       {/* Main Content Area */}
-      <div className="flex-1 h-full overflow-y-auto bg-white text-black p-6">
+      <div className={`flex-1 h-full overflow-y-auto ${!isLoginPage && token ? 'bg-white text-black p-6' : 'bg-gray-100 text-black flex items-center justify-center'}`}>
         <Routes>
-          <Route path="/addhostel" element={<Addhostel />} />
-          <Route path="/viewhostel" element={<Viewhostel />} />
-          <Route path="/Edithostel/:id" element={<Edithostel />} />
-          <Route path="/adminlogin" element={<Login/>} />
+          <Route path="/adminlogin" element={<Login />} />
+
+          <Route
+            path="/"
+            element={
+              <ProtectedRoute>
+                <Addhostel />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/viewhostel"
+            element={
+              <ProtectedRoute>
+                <Viewhostel />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/Edithostel/:id"
+            element={
+              <ProtectedRoute>
+                <Edithostel />
+              </ProtectedRoute>
+            }
+          />
         </Routes>
       </div>
     </div>
-  )
-}
+  );
+};
 
 export default App;

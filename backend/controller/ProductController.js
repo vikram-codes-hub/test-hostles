@@ -3,7 +3,7 @@ import Product from '../modules/Product.js';
 
 export const addHostel = async (req, res) => {
   try {
-    const { name, description, price, image, category, sizes } = req.body;
+    const { name, description, price, image, category } = req.body;
     const image1 = req.files.image1 && req.files.image1[0];
     const image2 = req.files.image2 && req.files.image2[0];
     const image3 = req.files.image3 && req.files.image3[0];
@@ -18,7 +18,7 @@ export const addHostel = async (req, res) => {
         }))
 
         const productdata={
-            name,description,price:Number(price),category,sizes:JSON.parse(sizes),image:imageurls,date:Date.now()
+            name,description,price:Number(price),category,image:imageurls,date:Date.now()
         }
 
         const product=new Product(productdata)

@@ -1,25 +1,33 @@
-import React, { useState } from "react";
+import React, { useState,useContext } from "react";
 import axios from 'axios';
 import { toast } from "react-toastify";
+import { AuthContext } from "../Context/authcontext";
+import { useNavigate } from "react-router-dom";
 
 const Login = ({ settoken }) => {
   const [email, setemail] = useState('');
   const [password, setPassword] = useState('');
 
+  const navigate=useNavigate()
+
+  const { login } = useContext(AuthContext);
+
+  //Login functionn
   const onsubmithandeler = async (e) => {
     e.preventDefault();
-    try {
-      const response = await axios.post('/api/user/admin', { email, password });
-      if (response.data.success) {
-        settoken(response.data.token);
-        toast.success("Login successful");
-      } else {
-        toast.error(response.data.message || "Login failed");
+    
+    const payload = {
+      email,password}
+
+      try {
+        const res = await login(payload);
+        // console.log("Login response:", res);
+        if(res.success){
+          navigate('/'); // Redirect to the home page
+        }
+      } catch (error) {
+         console.error("Login/Register failed", error);
       }
-    } catch (error) {
-      console.log(error);
-      toast.error("Something went wrong");
-    }
   };
 
 return (
