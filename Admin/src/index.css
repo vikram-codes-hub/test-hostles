@@ -14,3 +14,7 @@ body {
 --color-cyan: #10B981; /* buttons */
 --color-lightCyan: #EF4444; /* remove */
 }
+
+::-webkit-scrollbar{
+  display: none;
+}

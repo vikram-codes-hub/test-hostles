@@ -7,6 +7,7 @@ import Addhostel from './Pages/Addhostel';
 import Viewhostel from './Pages/Viewhostel';
 import Login from './Pages/Login';
 import { AuthContext } from './Context/authcontext';
+import Chat from './Pages/Chat';
 
 const App = () => {
   const { token } = useContext(AuthContext);
@@ -30,7 +31,7 @@ const App = () => {
       {/* Main Content Area */}
       <div className={`flex-1 h-full overflow-y-auto ${!isLoginPage && token ? 'bg-white text-black p-6' : 'bg-gray-100 text-black flex items-center justify-center'}`}>
         <Routes>
-          <Route path="/adminlogin" element={<Login />} />
+          <Route path="/adminlogin" element={!token?<Login/>:Navigate("/")} />
 
           <Route
             path="/"
@@ -56,6 +57,7 @@ const App = () => {
               </ProtectedRoute>
             }
           />
+          <Route path="/chat" element={<ProtectedRoute><Chat /></ProtectedRoute>} />
         </Routes>
       </div>
     </div>

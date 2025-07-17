@@ -5,6 +5,7 @@ import App from "./App.jsx";
 import { BrowserRouter } from "react-router-dom";
 import Hostelscontextprovider from "./Context/Hostelss.jsx";
 import AuthContextProvider from "./Context/auth";
+import ChatContextProvider from "./Context/Chatcontext.jsx";
 
 createRoot(document.getElementById("root")).render(
 
@@ -13,8 +14,11 @@ createRoot(document.getElementById("root")).render(
   <AuthContextProvider>
 
   <Hostelscontextprovider>
+    <ChatContextProvider>
 
     <App />
+    </ChatContextProvider>
+
   </Hostelscontextprovider>
   </AuthContextProvider>
   </BrowserRouter>

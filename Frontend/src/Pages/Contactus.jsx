@@ -102,10 +102,10 @@ const Contact = () => {
           <span className="mb-4 inline-block rounded-full bg-blue-100 px-4 py-1 text-sm font-semibold text-blue-600 dark:bg-blue-900 dark:text-blue-200">
             Contact Us
           </span>
-          <h2 className="mb-4 text-4xl font-bold text-gray-800 dark:text-white md:text-5xl">
+          <h2 className="mb-4 text-4xl font-bold text-black md:text-5xl">
             Let's Get In Touch
           </h2>
-          <p className="mx-auto max-w-2xl text-lg text-gray-600 dark:text-gray-300">
+          <p className="mx-auto max-w-2xl text-lg text-black">
             Have questions about our hostel services? Want to provide feedback? We'd love to hear from you!
           </p>
         </motion.div>

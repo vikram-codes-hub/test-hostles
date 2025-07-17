@@ -16,7 +16,7 @@ const Sidebar = () => {
         </div>
 
         <div className='flex flex-col mt-10'>
-          <NavLink to='/addhostel' className='flex items-center gap-3 border p-2 px-4 border-gray-300 border-r-0 rounded-l ml-1'>
+          <NavLink to='/' className='flex items-center gap-3 border p-2 px-4 border-gray-300 border-r-0 rounded-l ml-1'>
             <IoIosAddCircleOutline className='w-5 h-5 text-black'/>
             <p className='hidden md:block md:text-[12px] lg:text-lg text-black'>Add Items</p>
           </NavLink>
@@ -25,11 +25,11 @@ const Sidebar = () => {
             <AiOutlineEye className='w-5 h-5 text-black'/>
             <p className='hidden md:block md:text-[12px] lg:text-lg text-black'>View My Hostels</p>
           </NavLink>
-{/* 
-          <NavLink to='/Edithostel' className='flex items-center gap-3 mt-5 border p-2 px-4 border-gray-300 ml-1 border-r-0 rounded-l'>
+
+          <NavLink to='/chat' className='flex items-center gap-3 mt-5 border p-2 px-4 border-gray-300 ml-1 border-r-0 rounded-l'>
             <CiEdit className='w-5 h-5 text-black'/>
-            <p className='hidden md:block md:text-[12px] lg:text-lg text-black'>Edit your hostels</p>
-          </NavLink> */}
+            <p className='hidden md:block md:text-[12px] lg:text-lg text-black'>Chat box</p>
+          </NavLink>
         </div>
       </div>
 

@@ -3,7 +3,7 @@ import Product from '../modules/Product.js';
 
 export const addHostel = async (req, res) => {
   try {
-    const { name, description, price, image, category } = req.body;
+    const { name, description, price,address,email,phone ,image, category } = req.body;
     const image1 = req.files.image1 && req.files.image1[0];
     const image2 = req.files.image2 && req.files.image2[0];
     const image3 = req.files.image3 && req.files.image3[0];
@@ -18,7 +18,7 @@ export const addHostel = async (req, res) => {
         }))
 
         const productdata={
-            name,description,price:Number(price),category,image:imageurls,date:Date.now()
+            name,description,price:Number(price),category,image:imageurls,date:Date.now(),address,email,phone
         }
 
         const product=new Product(productdata)
@@ -48,9 +48,12 @@ export const listHostels=async(req,res)=>{
 //Single hostel info
 
 export const Singelhostelinfo=async(req,res)=>{
+
+  const {id}=req.params
+
     try {
-      const {id}=req.body
       const hostel=await Product.findById(id);
+      console.log("Single hostel info:", hostel);
      if (!hostel) {
       return res.json({ success: false, mssg: "Hostel not found" });
     }
@@ -74,3 +77,48 @@ export const removeHostel=async(req,res)=>{
     res.json({ success: false, mssg: error.message });
   }
 };
+
+//edit hostel info
+export const edithostel = async (req, res) => {
+  const { id } = req.params;
+  const { name, description, price, category,address,phone,email } = req.body;
+
+  // Handle uploaded images
+  const images = req.files; 
+  const imagePaths = {
+    image1: images?.image1?.[0]?.path || undefined,
+    image2: images?.image2?.[0]?.path || undefined,
+    image3: images?.image3?.[0]?.path || undefined,
+    image4: images?.image4?.[0]?.path || undefined,
+  };
+
+
+  const updateData = {
+    name,
+    description,
+    price: Number(price),
+    category,
+    address,email,phone
+  };
+
+  // Only add image fields if new images are uploaded
+  for (const key in imagePaths) {
+    if (imagePaths[key]) {
+      updateData[key] = imagePaths[key];
+    }
+  }
+
+  try {
+    const updatedhostel = await Product.findByIdAndUpdate(id, updateData, {
+      new: true,
+    });
+
+    res.json({ success: true, hostel: updatedhostel });
+  } catch (err) {
+    console.error(err);
+    res
+      .status(500)
+      .json({ success: false, mssg: "Failed to update hostel" });
+  }
+};
+
