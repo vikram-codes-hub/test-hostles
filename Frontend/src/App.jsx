@@ -15,6 +15,7 @@ import Helpcenter from './Pages/Helpcenter'
 import ProfilePage from './Pages/ProfilePage'
 import { toast, ToastContainer } from "react-toastify";
 
+
 import { AuthContext } from './Context/auth'
 
 const App = () => {
@@ -22,6 +23,8 @@ const App = () => {
   const hideNavAndFooter = location.pathname === '/login';
 
   const {authuser}=useContext(AuthContext)
+
+
 
   return (
     <div>

@@ -6,27 +6,31 @@ import { AuthContext } from '../Context/auth';
 
 const Allhostels = () => {
   const { search, showSearch } = useContext(HostelsContext);
-  const { listhostels } = useContext(AuthContext);
+  const { listHostels } = useContext(AuthContext);
 
   const [hostels, setHostels] = useState([]);
   const [filteredHostels, setFilteredHostels] = useState([]);
   const [categoryFilter, setCategoryFilter] = useState([]);
   const [sortType, setSortType] = useState('');
 
+  // Fetch hostels from the backend
   useEffect(() => {
-  const fetchHostels = async () => {
-    const data = await listhostels();
-    // console.log("API raw data:", data);
-    if (data.success) {
-      // console.log("Setting hostels:", data.hostel); 
-      setHostels(data.hostel);
-      setFilteredHostels(data.hostel);
-    }
-  };
-  fetchHostels();
-}, []);
+    const fetchHostels = async () => {
+      try {
+        const hostelsData = await listHostels(); 
+        setHostels(hostelsData || []);
+     
+        setFilteredHostels(hostelsData || []); 
+      } catch (error) {
+        console.error('Error fetching hostels:', error);
+        setHostels([]);
+        setFilteredHostels([]);
+      }
+    };
+    fetchHostels();
+  }, [listHostels]);
 
-
+  // Apply filters and sorting
   useEffect(() => {
     let filtered = [...hostels];
 
@@ -57,6 +61,7 @@ const Allhostels = () => {
     setFilteredHostels(filtered);
   }, [hostels, search, showSearch, categoryFilter, sortType]);
 
+  // Toggle category filter
   const toggleFilter = (e) => {
     const value = e.target.value;
     setCategoryFilter(prev =>
@@ -65,8 +70,6 @@ const Allhostels = () => {
         : [...prev, value]
     );
   };
-  
-  console.log(hostels)
 
   return (
     <div className="flex flex-col lg:flex-row gap-6 pt-10 px-4 lg:px-10">
@@ -103,7 +106,7 @@ const Allhostels = () => {
 
         {/* Hostel Items */}
         <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-6">
-          {filteredHostels.map((item, index) => (
+          {filteredHostels?.map((item, index) => ( // Use optional chaining to avoid errors
             <Productitem
               key={index}
               name={item.name}

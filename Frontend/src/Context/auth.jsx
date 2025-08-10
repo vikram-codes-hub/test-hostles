@@ -1,18 +1,19 @@
 import axios from 'axios';
-import React, { createContext, useEffect, useState } from 'react';
+import React, { createContext, useContext, useEffect, useState } from 'react';
 import { toast } from 'react-hot-toast';
 import { io } from 'socket.io-client';
+import { ChatContext } from './Chatcontext';
 
 export const AuthContext = createContext();
 
-const backendUrl = 'http://localhost:8000';
+const backendUrl = import.meta.env.VITE_BACKEND_URL;
 
 const AuthContextProvider = ({ children }) => {
   const [authuser, setauthuser] = useState(null);
   const [token, settoken] = useState('');
-  const [axiosready, setaxiosready] = useState(false);
   const [socket, setsocket] = useState(null);
   const [onlineuser, setonlineuser] = useState([]);
+  const [selecteduser, setSelectedUser] = useState(null);
 
   axios.defaults.baseURL = backendUrl;
 
@@ -23,25 +24,37 @@ const AuthContextProvider = ({ children }) => {
       axios.defaults.headers.common['Authorization'] = token;
       settoken(token);
       setauthuser(JSON.parse(user));
-      setaxiosready(true);
     }
   }, []);
 
-  const Login = async (data) => {
+  const Login = async (credentials, state) => {
     try {
-      const res = await axios.post('/api/user/login', data);
-      const { token, user } = res.data;
+      const res = await axios.post(`/api/auth/${state}`, credentials);
+
+      const { token, user, isAdmin } = res.data;
 
       localStorage.setItem('token', token);
       localStorage.setItem('user', JSON.stringify(user));
-
       axios.defaults.headers.common['Authorization'] = token;
+
+      if (isAdmin) {
+        localStorage.removeItem("selectedUser");
+        setSelectedUser(null);
+      } else {
+        localStorage.removeItem("selectedUser");
+        setSelectedUser(null);
+      }
+
       settoken(token);
       setauthuser(user);
-      setaxiosready(true);
-      toast.success('Login successful');
+      toast.success(`${state === 'login' ? 'Login' : 'Signup'} successful`);
+      return res.data;
+
     } catch (err) {
-      toast.error(err.response?.data?.message || 'Login failed');
+      toast.error(
+        err.response?.data?.message || `${state === 'login' ? 'Login' : 'Signup'} failed`
+      );
+      throw err;
     }
   };
 
@@ -51,43 +64,66 @@ const AuthContextProvider = ({ children }) => {
     setauthuser(null);
     settoken('');
     delete axios.defaults.headers.common['Authorization'];
-    toast.success('Logged out');
+    if (socket) socket.disconnect();
+    setsocket(null);
+    toast.success('Logged out successfully');
+  };
+
+  const checkAuth = async () => {
+    try {
+      const res = await axios.get('/api/auth/check');
+      if (res.data.success) {
+        setauthuser(res.data.user);
+        connectsocket(res.data.user);
+      }
+    } catch (err) {
+      Logout();
+    }
   };
 
   const UpdateProfile = async (data) => {
     try {
-      const res = await axios.patch('/api/user/update', data);
+      const res = await axios.put('/api/auth/update-profile', data);
       const updatedUser = res.data.user;
-
       localStorage.setItem('user', JSON.stringify(updatedUser));
       setauthuser(updatedUser);
-      toast.success('Profile updated');
+      toast.success('Profile updated successfully');
     } catch (err) {
-      toast.error(err.response?.data?.message || 'Update failed');
+      toast.error(err.response?.data?.message || 'Profile update failed');
     }
   };
 
-  const addLike = async (hostelId) => {
-    try {
-      const res = await axios.post(`/api/user/like/${hostelId}`);
-      toast.success(res.data.message);
-    } catch (err) {
-      toast.error(err.response?.data?.message || 'Failed to like hostel');
-    }
-  };
+const addLike = async (hostelId) => {
+  try {
+    const res = await axios.post(`/api/likes/add`, {
+      hostelId: hostelId  
+    });
+    toast.success(res.data.message);
+    return res.data;
+  } catch (err) {
+    toast.error(err.response?.data?.message || 'Failed to like hostel');
+    throw err;
+  }
+};
 
-  const removeLike = async (hostelId) => {
-    try {
-      const res = await axios.delete(`/api/user/unlike/${hostelId}`);
-      toast.success(res.data.message);
-    } catch (err) {
-      toast.error(err.response?.data?.message || 'Failed to unlike hostel');
-    }
-  };
+ const removeLike = async (hostelId) => {
+  try {
+    const res = await axios.post(`/api/likes/remove`, {
+      hostelId: hostelId 
+    });
+    toast.success(res.data.message);
+    return res.data;
+  } catch (err) {
+    toast.error(err.response?.data?.message || 'Failed to unlike hostel');
+    throw err;
+  }
+};
+
 
   const getSavedHostels = async () => {
     try {
-      const res = await axios.get('/api/user/saved');
+      const res = await axios.get('/api/likes/');
+      console.log(res.data)
       return res.data.hostels;
     } catch (err) {
       toast.error(err.response?.data?.message || 'Failed to get saved hostels');
@@ -95,10 +131,10 @@ const AuthContextProvider = ({ children }) => {
     }
   };
 
-  const listhostels = async () => {
+  const listHostels = async () => {
     try {
-      const res = await axios.get('/api/hostel/list');
-      return res.data.hostels;
+      const res = await axios.get('/api/hostel/listhostels');
+      return res.data.hostel;
     } catch (err) {
       toast.error('Failed to fetch hostels');
       return [];
@@ -107,8 +143,8 @@ const AuthContextProvider = ({ children }) => {
 
   const getSingleHostelInfo = async (id) => {
     try {
-      const res = await axios.get(`/api/hostel/${id}`);
-      return res.data.hostel;
+      const res = await axios.get(`/api/hostel/singelhostelinfo/${id}`);
+      return res.data;
     } catch (err) {
       toast.error('Failed to fetch hostel info');
       return null;
@@ -140,20 +176,23 @@ const AuthContextProvider = ({ children }) => {
     authuser,
     Login,
     Logout,
+    checkAuth,
     UpdateProfile,
     addLike,
     removeLike,
     getSavedHostels,
-    listhostels,
+    listHostels,
     getSingleHostelInfo,
-    socket,
     connectsocket,
+    socket,
     onlineuser,
+    selecteduser, 
+    setSelectedUser
   };
 
   return (
     <AuthContext.Provider value={values}>
-      {axiosready && children}
+      {children}
     </AuthContext.Provider>
   );
 };

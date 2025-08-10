@@ -1,7 +1,8 @@
-import React, { useState, useContext } from "react";
+import React, { useState, useContext,useEffect } from "react";
 import { useNavigate } from 'react-router-dom';
 import bgImage from "../assets/Manipal_University_Jaipur_54f94876cd.jpg";
 import { AuthContext } from "../Context/auth";
+
 
 export default function App() {
  const navigate = useNavigate()
@@ -11,7 +12,7 @@ export default function App() {
   const [name, setName] = useState("");
   const [isDataSubmitted, setIsDataSubmitted] = useState(false);
 
-  const { Login } = useContext(AuthContext); 
+  const { Login,authuser } = useContext(AuthContext); 
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -28,10 +29,13 @@ export default function App() {
       const endpoint = formmode === "signup" ? "signup" : "login";
 
       try {
-        const res = await Login(endpoint, payload);
-if (res.success) {
+        const res = await Login(payload, endpoint);
+  
+if(res.success) {
+
   navigate('/'); 
 }
+
 
       } catch (err) {
         console.error("Login/Register failed", err);
