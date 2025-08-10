@@ -8,7 +8,7 @@ const likeSchema = new mongoose.Schema({
   },
   hostelId: {
     type: mongoose.Schema.Types.ObjectId,
-    ref: 'Product', // assuming "Product" is your hostel model
+    ref: 'Product',
     required: true,
   },
   likedAt: {

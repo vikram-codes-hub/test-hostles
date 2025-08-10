@@ -5,7 +5,10 @@ import userModel from '../modules/User.js'
 
 export const isLoggedin=async(req,res,next)=>{
     try {
-      const token=req.headers.token
+      const token = req.headers.authorization;
+
+      
+  console.log("🔐 Received token on server:", token);
       const decodedtoken=jwt.verify(token,process.env.JWT_SECRET)
       const user=await userModel.findById(decodedtoken.id).select("-password")
       if(!user){

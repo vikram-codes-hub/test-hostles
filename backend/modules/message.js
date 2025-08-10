@@ -1,21 +1,21 @@
 import mongoose from "mongoose";
 
-const messageschema = new mongoose.Schema({
-  sender: {
+const messageSchema = new mongoose.Schema({
+  senderId: {
     type: mongoose.Schema.Types.ObjectId,
     ref: "User",
     required: true
   },
-  receiver: {
+  receiverId: {
     type: mongoose.Schema.Types.ObjectId,
     ref: "User",
     required: true
   },
-  message: {
+  text: {
     type: String,
     required: true
   },
-  timestamp: {
+  createdAt: {
     type: Date,
     default: Date.now
   },
@@ -25,6 +25,6 @@ const messageschema = new mongoose.Schema({
   }
 });
 
-const Message = mongoose.models.Message || mongoose.model("Message", messageschema);
+const Message = mongoose.models.Message || mongoose.model("Message", messageSchema);
 
 export default Message;

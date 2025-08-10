@@ -3,12 +3,15 @@ import 'dotenv/config'
 import cors from 'cors'
 import http from 'http'
 import { connectDb }  from './config/db.js'
+import {Server} from 'socket.io'
 
+//Routes for the application
 import userRouter from './routes/userroute.js'
 import HostelRoute from './routes/HostelRoutes.js'
 import LikeRoute from './routes/Likeroute.js'
-import {Server} from 'socket.io'
 import MessageRoute from './routes/Messageroute.js'
+import AdminRoute from './routes/adminroute.js'
+import roommaterfinder from './routes/Roommate.js'
 
 
 const app=express()
@@ -69,12 +72,18 @@ app.get('/',(req,res)=>{
 //routes
 //user routes
 app.use('/api/auth',userRouter)
+//admin route
+app.use('/api/admin',AdminRoute)
 //hostel routes
 app.use('/api/hostel',HostelRoute)
 //saved hostel routes
-app.use('/api/like',LikeRoute);
+app.use('/api/likes',LikeRoute);
 //message routes
 app.use('/api/message',MessageRoute)
+//roommate routes
+app.use('/api/roommate',roommaterfinder)
+
+
 
 const PORT=process.env.PORT ||5000
 server.listen(PORT,()=>console.log("Server is running on the port: "+PORT))

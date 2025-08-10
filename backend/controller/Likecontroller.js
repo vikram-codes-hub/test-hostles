@@ -1,88 +1,122 @@
 import mongoose from "mongoose";
 import Like from "../modules/Like.js";
 import Product from "../modules/Product.js";
-import userModel from "../modules/User.js";
 
 // Add Like
 export const addLike = async (req, res) => {
   try {
-    const { userId, hostelId } = req.body;
+    const userId = req.user._id; // Get from auth middleware
+    const { hostelId } = req.body;
 
-    // Validate IDs
-    if (!mongoose.Types.ObjectId.isValid(userId) || !mongoose.Types.ObjectId.isValid(hostelId)) {
-      return res.status(400).json({ success: false, mssg: "Invalid user or hostel ID" });
+    // Validate hostel ID
+    if (!mongoose.Types.ObjectId.isValid(hostelId)) {
+      return res.status(400).json({ success: false, message: "Invalid hostel ID" });
     }
 
-    const user = await userModel.findById(userId);
+    // Check if hostel exists
     const hostel = await Product.findById(hostelId);
-     console.log("userData:", user);
-    console.log("hostelData:", hostel);
-
-    if (!user || !hostel) {
-      return res.status(404).json({ success: false, mssg: "User or hostel not found" });
+    if (!hostel) {
+      return res.status(404).json({ success: false, message: "Hostel not found" });
     }
 
-    // Prevent duplicate likes
+    // Check if already liked
     const existingLike = await Like.findOne({ userId, hostelId });
     if (existingLike) {
-      return res.status(400).json({ success: false, mssg: "Already liked" });
+      return res.status(400).json({ success: false, message: "Hostel already liked" });
     }
 
+    // Create new like
     const like = new Like({ userId, hostelId });
     await like.save();
 
-    res.json({ success: true, mssg: "Hostel liked" });
+    res.json({ success: true, message: "Hostel liked successfully" });
   } catch (error) {
-    console.error(error);
-    res.status(500).json({ success: false, mssg: error.message });
+    console.error("Add like error:", error);
+    
+    // Handle duplicate key error from database unique index
+    if (error.code === 11000) {
+      return res.status(400).json({ success: false, message: "Hostel already liked" });
+    }
+    
+    res.status(500).json({ success: false, message: "Server error" });
   }
 };
 
 // Remove Like
 export const removeLike = async (req, res) => {
   try {
-    const { userId, hostelId } = req.body;
+    const userId = req.user._id; // Get from auth middleware
+    const { hostelId } = req.body;
 
-    // Validate IDs
-    if (!mongoose.Types.ObjectId.isValid(userId) || !mongoose.Types.ObjectId.isValid(hostelId)) {
-      return res.status(400).json({ success: false, mssg: "Invalid user or hostel ID" });
+    // Validate hostel ID
+    if (!mongoose.Types.ObjectId.isValid(hostelId)) {
+      return res.status(400).json({ success: false, message: "Invalid hostel ID" });
     }
 
+    // Remove like
     const like = await Like.findOneAndDelete({ userId, hostelId });
 
     if (!like) {
-      return res.status(404).json({ success: false, mssg: "Like not found" });
+      return res.status(404).json({ success: false, message: "Like not found" });
     }
 
-    res.json({ success: true, mssg: "Hostel removed from liked list" });
+    res.json({ success: true, message: "Hostel removed from liked list" });
   } catch (error) {
-    console.error(error);
-    res.status(500).json({ success: false, mssg: error.message });
+    console.error("Remove like error:", error);
+    res.status(500).json({ success: false, message: "Server error" });
   }
 };
 
 // Get Liked Hostels
 export const getLiked = async (req, res) => {
   try {
-    const { userId } = req.body;
+    const userId = req.user._id; // Get from auth middleware
 
-    // Validate user ID
-    if (!mongoose.Types.ObjectId.isValid(userId)) {
-      return res.status(400).json({ success: false, mssg: "Invalid user ID" });
+    // Get all likes for the user with populated hostel data
+    const likes = await Like.find({ userId })
+      .populate({
+        path: 'hostelId',
+        model: 'Product'
+      })
+      .sort({ likedAt: -1 }); // Most recent likes first
+
+    // Filter out likes where hostel might have been deleted and extract hostel data
+    const likedHostels = likes
+      .filter(like => like.hostelId)
+      .map(like => ({
+        ...like.hostelId.toObject(),
+        likedAt: like.likedAt // Include when it was liked
+      }));
+
+    res.json({ 
+      success: true, 
+      hostels: likedHostels,
+      count: likedHostels.length 
+    });
+  } catch (error) {
+    console.error("Get liked error:", error);
+    res.status(500).json({ success: false, message: "Server error" });
+  }
+};
+
+// Check if hostel is liked (useful for frontend)
+export const checkLikeStatus = async (req, res) => {
+  try {
+    const userId = req.user._id;
+    const { hostelId } = req.params;
+
+    if (!mongoose.Types.ObjectId.isValid(hostelId)) {
+      return res.status(400).json({ success: false, message: "Invalid hostel ID" });
     }
 
-    const likes = await Like.find({ userId });
-
-    const hostelIds = likes
-      .map((like) => like.hostelId)
-      .filter((id) => mongoose.Types.ObjectId.isValid(id))
-      .map((id) => new mongoose.Types.ObjectId(id));
-
-    const likedHostels = await Product.find({ _id: { $in: hostelIds } });
-
-    res.json({ success: true, hostels: likedHostels });
+    const like = await Like.findOne({ userId, hostelId });
+    
+    res.json({ 
+      success: true, 
+      isLiked: !!like 
+    });
   } catch (error) {
-    console.error(error);
-    res.status(500).json({ success: false, mssg: error.message });
+    console.error("Check like status error:", error);
+    res.status(500).json({ success: false, message: "Server error" });
   }
 };
