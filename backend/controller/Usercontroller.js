@@ -147,14 +147,14 @@ export const checkAuth = (req, res) => {
 // Update user profile - UPDATED TO HANDLE BIO
 export const updateProfile = async (req, res) => {
   try {
-    const { fullName, profilePic, bio } = req.body; // Add bio here
+    const { fullName, profilePic, bio } = req.body; 
     const userId = req.user._id;
     let updatedUser;
 
     // Prepare update object
     const updateData = {};
     if (fullName !== undefined) updateData.fullName = fullName;
-    if (bio !== undefined) updateData.bio = bio; // Add bio to update
+    if (bio !== undefined) updateData.bio = bio; 
 
     if (!profilePic) {
       // Update without changing profile picture
@@ -162,7 +162,7 @@ export const updateProfile = async (req, res) => {
         userId,
         updateData,
         { new: true }
-      ).select('-password'); // Exclude password from response
+      ).select('-password'); 
     } else {
       // Update with new profile picture
       const upload = await cloudinary.uploader.upload(profilePic);
