@@ -4,7 +4,7 @@ import Title from '../Components/Title';
 import { AuthContext } from '../Context/authcontext';
 
 const Addhostel = () => {
-  const { addproduct } = useContext(AuthContext);
+  const { addHostel } = useContext(AuthContext);
 
   const [formData, setFormData] = useState({
     name: '',
@@ -60,7 +60,7 @@ const Addhostel = () => {
 
     try {
       setLoading(true);
-      const res = await addproduct(payload);
+      const res = await addHostel(payload);
 
       if (res?.data?.success) {
         toast.success('Hostel added successfully!');

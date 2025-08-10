@@ -5,7 +5,7 @@ import { AuthContext } from "../Context/authcontext";
 import { toast } from "react-toastify";
 
 const Edithostel = () => {
-  const { getSingleHostelInfo, edithostel } = useContext(AuthContext);
+  const { getSingleHostelInfo,edithostel } = useContext(AuthContext);
   const { id } = useParams();
   const navigate = useNavigate();
 

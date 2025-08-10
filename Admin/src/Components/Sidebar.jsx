@@ -34,9 +34,9 @@ const Sidebar = () => {
       </div>
 
      
-      <div className='mt-auto flex items-center gap-3 border mb-9 p-2 px-4 border-gray-300 border-r-0 ml-1 rounded-l'>
+      <div onClick={logout} className='mt-auto flex items-center gap-3 border mb-9 p-2 px-4 border-gray-300 border-r-0 ml-1 rounded-l cursor-pointer hover:bg-gray-200'>
         
-        <p onClick={logout} className='text-black text-sm md:text-[12px] lg:text-lg ml-5 md:ml-10'>Logout</p>
+        <p  className='text-black text-sm md:text-[12px] lg:text-lg ml-5 md:ml-10'>Logout</p>
       </div>
     </div>
   )

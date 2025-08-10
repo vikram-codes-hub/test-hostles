@@ -10,54 +10,112 @@ import { AuthContext } from './Context/authcontext';
 import Chat from './Pages/Chat';
 
 const App = () => {
-  const { token } = useContext(AuthContext);
+  const { token, isAuthReady, authUser } = useContext(AuthContext);
   const location = useLocation();
-
+  
   const isLoginPage = location.pathname === "/adminlogin";
 
-  // Protected Route Wrapper
-  const ProtectedRoute = ({ children }) => {
-    if (!token) return <Navigate to="/adminlogin" replace />;
+  // AdminRouteWrapper Component
+  const AdminRouteWrapper = ({ children }) => {
+    // Show loading while auth is initializing
+    if (!isAuthReady) {
+      return (
+        <div className="flex items-center justify-center min-h-screen bg-gray-50">
+          <div className="text-center">
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
+            <p className="text-gray-600">Loading...</p>
+          </div>
+        </div>
+      );
+    }
+
+    // Redirect to login if not authenticated
+    if (!token || !authUser) {
+      return <Navigate to="/adminlogin" replace />;
+    }
+
+    // Only show admin content if user is admin
+    if (authUser.role !== 'admin') {
+      return (
+        <div className="flex items-center justify-center min-h-screen bg-red-50">
+          <div className="text-center">
+            <h2 className="text-2xl font-bold text-red-600 mb-2">Access Denied</h2>
+            <p className="text-red-500">You don't have admin privileges</p>
+          </div>
+        </div>
+      );
+    }
+
     return children;
   };
 
   return (
     <div className="h-screen flex overflow-hidden text-white">
       <ToastContainer />
-
-      {/* Sidebar only visible when not on login page AND token is valid */}
-      {!isLoginPage && token && <Sidebar />}
-
+      
+      {/* Show sidebar only when authenticated and not on login page */}
+      {!isLoginPage && isAuthReady && token && authUser && <Sidebar />}
+      
       {/* Main Content Area */}
-      <div className={`flex-1 h-full overflow-y-auto ${!isLoginPage && token ? 'bg-white text-black p-6' : 'bg-gray-100 text-black flex items-center justify-center'}`}>
+      <div className={`flex-1 h-full overflow-y-auto ${
+        !isLoginPage && isAuthReady && token && authUser 
+          ? 'bg-white text-black p-6' 
+          : 'bg-gray-100 text-black flex items-center justify-center'
+      }`}>
         <Routes>
-          <Route path="/adminlogin" element={!token?<Login/>:Navigate("/")} />
-
-          <Route
+          {/* Public Route - Login */}
+          <Route path="/adminlogin" element={<Login />} />
+          
+          {/* Protected Routes with AdminRouteWrapper */}
+          <Route 
             path="/"
             element={
-              <ProtectedRoute>
+              <AdminRouteWrapper>
                 <Addhostel />
-              </ProtectedRoute>
+              </AdminRouteWrapper>
             }
           />
-          <Route
+          
+          <Route 
             path="/viewhostel"
             element={
-              <ProtectedRoute>
+              <AdminRouteWrapper>
                 <Viewhostel />
-              </ProtectedRoute>
+              </AdminRouteWrapper>
             }
           />
-          <Route
+          
+          <Route 
             path="/Edithostel/:id"
             element={
-              <ProtectedRoute>
+              <AdminRouteWrapper>
                 <Edithostel />
-              </ProtectedRoute>
+              </AdminRouteWrapper>
             }
           />
-          <Route path="/chat" element={<ProtectedRoute><Chat /></ProtectedRoute>} />
+          
+          <Route 
+            path="/chat" 
+            element={
+              <AdminRouteWrapper>
+                <Chat />
+              </AdminRouteWrapper>
+            } 
+          />
+          
+          {/* Catch all route - redirect to login if not authenticated */}
+          <Route 
+            path="*" 
+            element={
+              isAuthReady ? (
+                token && authUser ? <Navigate to="/" replace /> : <Navigate to="/adminlogin" replace />
+              ) : (
+                <div className="flex items-center justify-center min-h-screen">
+                  <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+                </div>
+              )
+            } 
+          />
         </Routes>
       </div>
     </div>

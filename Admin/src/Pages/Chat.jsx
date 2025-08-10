@@ -3,6 +3,7 @@ import Leftsidebar from '../Components/Leftsidebar'
 import Chatcontainer from '../Components/Chatcontainer'
 import RIghtsidebar from '../Components/RIghtsidebar'
 import { ChatContext } from '../Context/chatcontext'
+import TokenDebugger from '../Components/Tokkendebugger'
 
 const Chat = () => {
   const { selecteduser } = useContext(ChatContext)
@@ -17,6 +18,7 @@ const Chat = () => {
         <Leftsidebar />
         <Chatcontainer />
         <RIghtsidebar />
+        {/* <TokenDebugger/> */}
       </div>
     </div>
   )
