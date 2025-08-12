@@ -17,6 +17,10 @@ import { toast, ToastContainer } from "react-toastify";
 
 
 import { AuthContext } from './Context/auth'
+import Roomateoption from './Pages/Roomateoption'
+import MyPosts from './Pages/MyPosts'
+import CreateRoommatePost from './Pages/CreateRoommatePost'
+import CreateRoomAvailablePost from './Pages/CreateRoomAvailablePost'
 
 const App = () => {
   const location = useLocation();
@@ -42,6 +46,12 @@ const App = () => {
         <Route path='/chat-app' element={authuser?<Chatbox />:<Navigate to="/login"/>} />
         <Route path='/help' element={authuser?<Helpcenter />:<Navigate to="/login"/>} />
         <Route path='/profile' element={authuser?<ProfilePage />:<Navigate to="/login"/>} />
+        <Route path='/roommatefinder' element={authuser?<Roomateoption/>:<Navigate to="/login"/>} />
+        <Route path='/myposts' element={authuser?<MyPosts/>:<Navigate to="/login"/>} />
+        <Route path='/roommatefinder/looking_for_roommate' element={authuser?<CreateRoommatePost/>:<Navigate to="/login"/>} />
+        <Route path='/roommatefinder/room_available' element={authuser?<CreateRoomAvailablePost/>:<Navigate to="/login"/>} />
+        
+
       </Routes>
       {!hideNavAndFooter && <Footer />}
     </div>
