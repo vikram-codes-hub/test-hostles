@@ -14,17 +14,47 @@ const AuthContextProvider = ({ children }) => {
   const [socket, setsocket] = useState(null);
   const [onlineuser, setonlineuser] = useState([]);
   const [selecteduser, setSelectedUser] = useState(null);
+  const [loading, setLoading] = useState(true); // Add loading state
 
   axios.defaults.baseURL = backendUrl;
 
   useEffect(() => {
-    const token = localStorage.getItem('token');
-    const user = localStorage.getItem('user');
-    if (token && user) {
-      axios.defaults.headers.common['Authorization'] = token;
-      settoken(token);
-      setauthuser(JSON.parse(user));
-    }
+    const initializeAuth = async () => {
+      const storedToken = localStorage.getItem('token');
+      const storedUser = localStorage.getItem('user');
+      
+      if (storedToken && storedUser) {
+        try {
+          // Set the token for the request
+          axios.defaults.headers.common['Authorization'] = storedToken;
+          
+          // Validate the token with your backend
+          const res = await axios.get('/api/auth/check');
+          
+          if (res.data.success) {
+            // Token is valid
+            settoken(storedToken);
+            setauthuser(res.data.user);
+            connectsocket(res.data.user);
+          } else {
+            // Token is invalid
+            throw new Error('Token validation failed');
+          }
+        } catch (error) {
+          console.log('Token validation failed:', error);
+          // Clear invalid data
+          localStorage.removeItem('token');
+          localStorage.removeItem('user');
+          delete axios.defaults.headers.common['Authorization'];
+          setauthuser(null);
+          settoken('');
+        }
+      }
+      
+      setLoading(false); // Always set loading to false
+    };
+
+    initializeAuth();
   }, []);
 
   const Login = async (credentials, state) => {
@@ -47,6 +77,7 @@ const AuthContextProvider = ({ children }) => {
 
       settoken(token);
       setauthuser(user);
+      connectsocket(user); // Connect socket after login
       toast.success(`${state === 'login' ? 'Login' : 'Signup'} successful`);
       return res.data;
 
@@ -93,31 +124,42 @@ const AuthContextProvider = ({ children }) => {
     }
   };
 
-const addLike = async (hostelId) => {
-  try {
-    const res = await axios.post(`/api/likes/add`, {
-      hostelId: hostelId  
-    });
-    toast.success(res.data.message);
-    return res.data;
-  } catch (err) {
-    toast.error(err.response?.data?.message || 'Failed to like hostel');
-    throw err;
-  }
-};
+  const addLike = async (hostelId) => {
+    try {
+      const res = await axios.post(`/api/likes/add`, {
+        hostelId: hostelId  
+      });
+      toast.success(res.data.message);
+      return res.data;
+    } catch (err) {
+      toast.error(err.response?.data?.message || 'Failed to like hostel');
+      throw err;
+    }
+  };
 
- const removeLike = async (hostelId) => {
+  const removeLike = async (hostelId) => {
+    try {
+      const res = await axios.post(`/api/likes/remove`, {
+        hostelId: hostelId 
+      });
+      toast.success(res.data.message);
+      return res.data;
+    } catch (err) {
+      toast.error(err.response?.data?.message || 'Failed to unlike hostel');
+      throw err;
+    }
+  };
+
+ const checkLikeStatus = async (hostelId) => {
   try {
-    const res = await axios.post(`/api/likes/remove`, {
-      hostelId: hostelId 
-    });
-    toast.success(res.data.message);
-    return res.data;
-  } catch (err) {
-    toast.error(err.response?.data?.message || 'Failed to unlike hostel');
-    throw err;
+    const res = await axios.get(`/api/likes/check/${hostelId}`);
+  
+    return res.data.isLiked; 
+  } catch (error) {
+    toast.error('Failed to check like status');
+    return false;
   }
-};
+}
 
 
   const getSavedHostels = async () => {
@@ -159,11 +201,11 @@ const addLike = async (hostelId) => {
     });
 
     newSocket.on('connect', () => {
-      console.log('✅ Socket connected:', newSocket.id);
+ 
     });
 
     newSocket.on('getOnlineUsers', (ids) => {
-      console.log('🔵 Online users:', ids);
+    
       setonlineuser(ids);
     });
 
@@ -174,6 +216,7 @@ const addLike = async (hostelId) => {
     axios,
     token,
     authuser,
+    loading, // Add loading to the context value
     Login,
     Logout,
     checkAuth,
@@ -187,7 +230,8 @@ const addLike = async (hostelId) => {
     socket,
     onlineuser,
     selecteduser, 
-    setSelectedUser
+    setSelectedUser,
+    checkLikeStatus,
   };
 
   return (

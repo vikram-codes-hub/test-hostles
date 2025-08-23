@@ -1,5 +1,7 @@
-import React, { useState } from 'react';
+import React, { useContext, useState } from 'react';
 import { ArrowLeft, MapPin, DollarSign, User, Home, Phone, Mail, MessageCircle, Upload, X, Check, Camera, Star } from 'lucide-react';
+import { Roommatecontext } from '../Context/Roommate';
+import { toast } from 'react-toastify';
 
 const CreateRoomAvailablePost = () => {
   const [formData, setFormData] = useState({
@@ -26,14 +28,16 @@ const CreateRoomAvailablePost = () => {
       amenities: []
     },
     contact: {
+      name: '',
       phone: '',
       email: '',
       whatsapp: '',
-      preferredContact: []
+      preferredContact: 'phone'
     },
     images: []
   });
 
+  const { CreateRoommatepost } = useContext(Roommatecontext);
   const [errors, setErrors] = useState({});
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [imagePreview, setImagePreview] = useState([]);
@@ -49,13 +53,12 @@ const CreateRoomAvailablePost = () => {
   ];
 
   const habitOptions = [
-    'non_smoker', 'vegetarian', 'early_riser', 'night_owl', 
-    'fitness_enthusiast', 'music_lover', 'pet_friendly'
+    'non_smoker', 'vegetarian', 'non_drinker', 'pet_friendly', 
+    'early_sleeper', 'night_owl'
   ];
 
   const amenityOptions = [
-    'wifi', 'ac', 'parking', 'washing_machine', 'refrigerator',
-    'kitchen', 'balcony', 'security', 'elevator', 'power_backup'
+    'wifi', 'ac', 'parking', 'laundry', 'kitchen', 'balcony', 'gym'
   ];
 
   const handleInputChange = (section, field, value) => {
@@ -90,7 +93,7 @@ const CreateRoomAvailablePost = () => {
   const handleImageUpload = (e) => {
     const files = Array.from(e.target.files);
     if (files.length + imagePreview.length > 5) {
-      alert('Maximum 5 images allowed');
+      toast.error('Maximum 5 images allowed');
       return;
     }
     
@@ -98,6 +101,10 @@ const CreateRoomAvailablePost = () => {
       const reader = new FileReader();
       reader.onload = (e) => {
         setImagePreview(prev => [...prev, e.target.result]);
+        setFormData(prev => ({
+          ...prev,
+          images: [...prev.images, e.target.result]
+        }));
       };
       reader.readAsDataURL(file);
     });
@@ -105,21 +112,45 @@ const CreateRoomAvailablePost = () => {
 
   const removeImage = (index) => {
     setImagePreview(prev => prev.filter((_, i) => i !== index));
+    setFormData(prev => ({
+      ...prev,
+      images: prev.images.filter((_, i) => i !== index)
+    }));
   };
 
   const validateForm = () => {
     const newErrors = {};
     
+    // Basic information
     if (!formData.title.trim()) newErrors.title = 'Title is required';
     if (!formData.description.trim()) newErrors.description = 'Description is required';
-    if (!formData.rent || formData.rent <= 0) newErrors.rent = 'Valid rent amount is required';
+    if (!formData.rent || isNaN(formData.rent)) newErrors.rent = 'Valid rent amount is required';
+
+    // Location
     if (!formData.location.area.trim()) newErrors.area = 'Area is required';
     if (!formData.location.nearbyCollege) newErrors.college = 'Nearby college is required';
-    if (!formData.preferences.gender) newErrors.gender = 'Gender preference is required';
+
+    // Room details
     if (!formData.roomDetails.roomType) newErrors.roomType = 'Room type is required';
     if (!formData.roomDetails.furnishing) newErrors.furnishing = 'Furnishing status is required';
+
+    // Preferences
+    if (!formData.preferences.gender) newErrors.gender = 'Gender preference is required';
+
+    // Contact
+    if (!formData.contact.name.trim()) newErrors.contactName = 'Contact name is required';
     if (!formData.contact.phone.trim()) newErrors.phone = 'Phone number is required';
-    if (formData.contact.preferredContact.length === 0) newErrors.contact = 'Select at least one contact method';
+    
+    // Phone validation
+    const phoneRegex = /^[6-9]\d{9}$/;
+    if (!phoneRegex.test(formData.contact.phone.replace(/\D/g, ''))) {
+      newErrors.phone = 'Please enter a valid 10-digit Indian mobile number';
+    }
+
+    // Email validation (if provided)
+    if (formData.contact.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.contact.email)) {
+      newErrors.email = 'Please enter a valid email address';
+    }
 
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
@@ -130,16 +161,87 @@ const CreateRoomAvailablePost = () => {
 
     setIsSubmitting(true);
     try {
-      // Here you would make the API call to your backend
-      console.log('Submitting room available post:', formData);
+      // Prepare the data exactly as the backend expects
+      const submitData = {
+        type: formData.type,
+        title: formData.title,
+        description: formData.description,
+        rent: parseInt(formData.rent),
+        location: {
+          area: formData.location.area,
+          city: formData.location.city,
+          nearbyCollege: formData.location.nearbyCollege,
+          fullAddress: formData.location.fullAddress
+        },
+        preferences: {
+          gender: formData.preferences.gender,
+          ageRange: {
+            min: formData.preferences.ageRange.min ? parseInt(formData.preferences.ageRange.min) : undefined,
+            max: formData.preferences.ageRange.max ? parseInt(formData.preferences.ageRange.max) : undefined
+          },
+          occupation: formData.preferences.occupation,
+          habits: formData.preferences.habits,
+          cleanliness: formData.preferences.cleanliness
+        },
+        roomDetails: {
+          roomType: formData.roomDetails.roomType,
+          furnishing: formData.roomDetails.furnishing,
+          amenities: formData.roomDetails.amenities
+        },
+        contact: {
+          name: formData.contact.name,
+          phone: formData.contact.phone.replace(/\D/g, ''),
+          email: formData.contact.email || undefined,
+          whatsapp: formData.contact.whatsapp ? formData.contact.whatsapp.replace(/\D/g, '') : undefined,
+          preferredContact: formData.contact.preferredContact
+        },
+        images: formData.images
+      };
+
+      const res = await CreateRoommatepost(submitData);
       
-      // Simulate API call
-      await new Promise(resolve => setTimeout(resolve, 2000));
-      
-      // Redirect back to roommate finder
-      window.location.href = '/roommatefinder';
+      if (res?.success) {
+        toast.success("Room available post created successfully!");
+        // Reset form
+        setFormData({
+          type: 'room_available',
+          title: '',
+          description: '',
+          rent: '',
+          location: {
+            area: '',
+            city: 'Jaipur',
+            nearbyCollege: '',
+            fullAddress: ''
+          },
+          preferences: {
+            gender: '',
+            ageRange: { min: '', max: '' },
+            occupation: '',
+            habits: [],
+            cleanliness: ''
+          },
+          roomDetails: {
+            roomType: '',
+            furnishing: '',
+            amenities: []
+          },
+          contact: {
+            name: '',
+            phone: '',
+            email: '',
+            whatsapp: '',
+            preferredContact: 'phone'
+          },
+          images: []
+        });
+        setImagePreview([]);
+      } else {
+        toast.error(res?.message || "Failed to create post");
+      }
     } catch (error) {
       console.error('Error creating post:', error);
+      toast.error(error.response?.data?.message || "An error occurred while creating the post");
     } finally {
       setIsSubmitting(false);
     }
@@ -347,7 +449,7 @@ const CreateRoomAvailablePost = () => {
               <label className="block text-sm font-medium text-gray-700 mb-3">
                 Available Amenities
               </label>
-              <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
                 {amenityOptions.map(amenity => (
                   <label key={amenity} className="flex items-center space-x-2 cursor-pointer p-2 rounded-lg hover:bg-gray-50">
                     <input
@@ -402,6 +504,8 @@ const CreateRoomAvailablePost = () => {
                     value={formData.preferences.ageRange.min}
                     onChange={(e) => handleInputChange('preferences', 'ageRange', {...formData.preferences.ageRange, min: e.target.value})}
                     placeholder="18"
+                    min="18"
+                    max="35"
                     className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-transparent"
                   />
                 </div>
@@ -415,6 +519,8 @@ const CreateRoomAvailablePost = () => {
                     value={formData.preferences.ageRange.max}
                     onChange={(e) => handleInputChange('preferences', 'ageRange', {...formData.preferences.ageRange, max: e.target.value})}
                     placeholder="30"
+                    min="18"
+                    max="35"
                     className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-transparent"
                   />
                 </div>
@@ -458,7 +564,7 @@ const CreateRoomAvailablePost = () => {
                 <label className="block text-sm font-medium text-gray-700 mb-3">
                   Preferred Tenant Habits
                 </label>
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
                   {habitOptions.map(habit => (
                     <label key={habit} className="flex items-center space-x-2 cursor-pointer p-2 rounded-lg hover:bg-gray-50">
                       <input
@@ -534,13 +640,29 @@ const CreateRoomAvailablePost = () => {
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Contact Name *
+                </label>
+                <input
+                  type="text"
+                  value={formData.contact.name}
+                  onChange={(e) => handleInputChange('contact', 'name', e.target.value)}
+                  placeholder="Your full name"
+                  className={`w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-transparent ${
+                    errors.contactName ? 'border-red-500' : 'border-gray-300'
+                  }`}
+                />
+                {errors.contactName && <p className="text-red-500 text-sm mt-1">{errors.contactName}</p>}
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
                   Phone Number *
                 </label>
                 <input
                   type="tel"
                   value={formData.contact.phone}
                   onChange={(e) => handleInputChange('contact', 'phone', e.target.value)}
-                  placeholder="+91 9876543210"
+                  placeholder="9876543210"
                   className={`w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-transparent ${
                     errors.phone ? 'border-red-500' : 'border-gray-300'
                   }`}
@@ -557,8 +679,11 @@ const CreateRoomAvailablePost = () => {
                   value={formData.contact.email}
                   onChange={(e) => handleInputChange('contact', 'email', e.target.value)}
                   placeholder="your.email@gmail.com"
-                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-transparent"
+                  className={`w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-transparent ${
+                    errors.email ? 'border-red-500' : 'border-gray-300'
+                  }`}
                 />
+                {errors.email && <p className="text-red-500 text-sm mt-1">{errors.email}</p>}
               </div>
 
               <div>
@@ -569,33 +694,27 @@ const CreateRoomAvailablePost = () => {
                   type="tel"
                   value={formData.contact.whatsapp}
                   onChange={(e) => handleInputChange('contact', 'whatsapp', e.target.value)}
-                  placeholder="+91 9876543210"
+                  placeholder="9876543210"
                   className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-transparent"
                 />
               </div>
 
-              <div>
+              <div className="md:col-span-2">
                 <label className="block text-sm font-medium text-gray-700 mb-3">
-                  How should tenants contact you? *
+                  Preferred Contact Method *
                 </label>
-                <div className="space-y-2">
-                  {[
-                    { value: 'phone', label: 'Phone Call', icon: Phone },
-                    { value: 'email', label: 'Email', icon: Mail },
-                    { value: 'whatsapp', label: 'WhatsApp', icon: MessageCircle }
-                  ].map(method => (
-                    <label key={method.value} className="flex items-center space-x-2 cursor-pointer">
-                      <input
-                        type="checkbox"
-                        checked={formData.contact.preferredContact.includes(method.value)}
-                        onChange={() => handleArrayToggle('contact', 'preferredContact', method.value)}
-                        className="w-4 h-4 text-emerald-600 border-gray-300 rounded focus:ring-emerald-500"
-                      />
-                      <method.icon className="w-4 h-4 text-gray-500" />
-                      <span className="text-sm text-gray-700">{method.label}</span>
-                    </label>
-                  ))}
-                </div>
+                <select
+                  value={formData.contact.preferredContact}
+                  onChange={(e) => handleInputChange('contact', 'preferredContact', e.target.value)}
+                  className={`w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-transparent ${
+                    errors.contact ? 'border-red-500' : 'border-gray-300'
+                  }`}
+                >
+                  <option value="phone">Phone Call</option>
+                  <option value="email">Email</option>
+                  <option value="whatsapp">WhatsApp</option>
+                  <option value="in_app_chat">In-App Chat</option>
+                </select>
                 {errors.contact && <p className="text-red-500 text-sm mt-1">{errors.contact}</p>}
               </div>
             </div>
@@ -619,12 +738,12 @@ const CreateRoomAvailablePost = () => {
               {isSubmitting ? (
                 <>
                   <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
-                  Publishing Room...
+                  Creating Post...
                 </>
               ) : (
                 <>
                   <Check className="w-4 h-4 mr-2" />
-                  Publish Room
+                  Create Post
                 </>
               )}
             </button>

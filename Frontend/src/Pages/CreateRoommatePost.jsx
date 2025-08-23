@@ -1,5 +1,7 @@
-import React, { useState } from 'react';
+import React, { useState, useContext } from 'react';
 import { ArrowLeft, MapPin, DollarSign, User, Home, Phone, Mail, MessageCircle, Upload, X, Check } from 'lucide-react';
+import { Roommatecontext } from '../Context/Roommate';
+import { toast } from 'react-toastify';
 
 const CreateRoommatePost = () => {
   const [formData, setFormData] = useState({
@@ -26,16 +28,18 @@ const CreateRoommatePost = () => {
       amenities: []
     },
     contact: {
+      name: '',
       phone: '',
       email: '',
       whatsapp: '',
-      preferredContact: []
+      preferredContact: '' 
     },
     images: []
   });
 
   const [errors, setErrors] = useState({});
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const { CreateRoommatepost } = useContext(Roommatecontext);
 
   const collegeOptions = [
     'Manipal University Jaipur',
@@ -48,13 +52,13 @@ const CreateRoommatePost = () => {
   ];
 
   const habitOptions = [
-    'non_smoker', 'vegetarian', 'early_riser', 'night_owl', 
-    'fitness_enthusiast', 'music_lover', 'pet_friendly'
+    'non_smoker', 'vegetarian', 'non_drinker', 'pet_friendly', 
+    'early_sleeper', 'night_owl'
   ];
 
   const amenityOptions = [
-    'wifi', 'ac', 'parking', 'washing_machine', 'refrigerator',
-    'kitchen', 'balcony', 'security', 'elevator', 'power_backup'
+    'wifi', 'ac', 'parking', 'laundry', 'kitchen', 
+    'balcony', 'gym'
   ];
 
   const handleInputChange = (section, field, value) => {
@@ -89,17 +93,83 @@ const CreateRoommatePost = () => {
   const validateForm = () => {
     const newErrors = {};
     
+    // Basic validation
     if (!formData.title.trim()) newErrors.title = 'Title is required';
+    if (formData.title.length > 100) newErrors.title = 'Title must be under 100 characters';
+    
     if (!formData.description.trim()) newErrors.description = 'Description is required';
+    if (formData.description.length > 1000) newErrors.description = 'Description must be under 1000 characters';
+    
     if (!formData.budget.min || !formData.budget.max) newErrors.budget = 'Budget range is required';
     if (!formData.location.area.trim()) newErrors.area = 'Area is required';
     if (!formData.location.nearbyCollege) newErrors.college = 'Nearby college is required';
     if (!formData.preferences.gender) newErrors.gender = 'Gender preference is required';
-    if (!formData.contact.phone.trim()) newErrors.phone = 'Phone number is required';
-    if (formData.contact.preferredContact.length === 0) newErrors.contact = 'Select at least one contact method';
+    
+    // Name validation
+    if (!formData.contact.name.trim()) newErrors.name = 'Name is required';
+    if (formData.contact.name.length > 50) newErrors.name = 'Name must be under 50 characters';
+    
+    // Phone validation
+    const phoneRegex = /^[6-9]\d{9}$/;
+    if (!formData.contact.phone.trim()) {
+      newErrors.phone = 'Phone number is required';
+    } else {
+      const cleanPhone = formData.contact.phone.replace(/\D/g, '');
+      if (!phoneRegex.test(cleanPhone)) {
+        newErrors.phone = 'Please enter a valid 10-digit Indian mobile number starting with 6-9';
+      }
+    }
+    
+    if (!formData.contact.preferredContact) newErrors.contact = 'Select a preferred contact method';
+
+    // Age range validation
+    if (formData.preferences.ageRange.min && (formData.preferences.ageRange.min < 18 || formData.preferences.ageRange.min > 35)) {
+      newErrors.ageMin = 'Minimum age must be between 18-35';
+    }
+    if (formData.preferences.ageRange.max && (formData.preferences.ageRange.max < 18 || formData.preferences.ageRange.max > 35)) {
+      newErrors.ageMax = 'Maximum age must be between 18-35';
+    }
 
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
+  };
+
+  const prepareDataForSubmission = () => {
+    const cleanedData = {
+      ...formData,
+      budget: {
+        min: parseInt(formData.budget.min),
+        max: parseInt(formData.budget.max),
+        currency: formData.budget.currency
+      },
+      preferences: {
+        ...formData.preferences,
+        ageRange: {
+          min: formData.preferences.ageRange.min ? parseInt(formData.preferences.ageRange.min) : undefined,
+          max: formData.preferences.ageRange.max ? parseInt(formData.preferences.ageRange.max) : undefined
+        }
+      },
+      contact: {
+        name: formData.contact.name.trim(),
+        phone: formData.contact.phone.replace(/\D/g, ''),
+        email: formData.contact.email ? formData.contact.email.trim() : undefined,
+        whatsapp: formData.contact.whatsapp ? formData.contact.whatsapp.replace(/\D/g, '') : undefined,
+        preferredContact: formData.contact.preferredContact
+      }
+    };
+
+    // Remove empty/undefined fields
+    if (!cleanedData.preferences.ageRange.min) delete cleanedData.preferences.ageRange.min;
+    if (!cleanedData.preferences.ageRange.max) delete cleanedData.preferences.ageRange.max;
+    if (!cleanedData.preferences.occupation) delete cleanedData.preferences.occupation;
+    if (!cleanedData.preferences.cleanliness) delete cleanedData.preferences.cleanliness;
+    if (!cleanedData.roomDetails.roomType) delete cleanedData.roomDetails.roomType;
+    if (!cleanedData.roomDetails.furnishing) delete cleanedData.roomDetails.furnishing;
+    if (!cleanedData.contact.email) delete cleanedData.contact.email;
+    if (!cleanedData.contact.whatsapp) delete cleanedData.contact.whatsapp;
+    if (!cleanedData.location.fullAddress) delete cleanedData.location.fullAddress;
+
+    return cleanedData;
   };
 
   const handleSubmit = async (e) => {
@@ -108,16 +178,46 @@ const CreateRoommatePost = () => {
 
     setIsSubmitting(true);
     try {
-      // Here you would make the API call to your backend
-      console.log('Submitting:', formData);
-      
-      // Simulate API call
-      await new Promise(resolve => setTimeout(resolve, 2000));
-      
-      // Redirect back to roommate finder
-      window.location.href = '/roommatefinder';
+      const submissionData = prepareDataForSubmission();
+      const res = await CreateRoommatepost(submissionData);
+      if (res?.data?.success) {
+        toast.success("Post created successfully");
+        setFormData({
+          type: 'looking_for_roommate',
+          title: '',
+          description: '',
+          budget: { min: '', max: '', currency: 'INR' },
+          location: {
+            area: '',
+            city: 'Jaipur',
+            nearbyCollege: '',
+            fullAddress: ''
+          },
+          preferences: {
+            gender: '',
+            ageRange: { min: '', max: '' },
+            occupation: '',
+            habits: [],
+            cleanliness: ''
+          },
+          roomDetails: {
+            roomType: '',
+            furnishing: '',
+            amenities: []
+          },
+          contact: {
+            name: '',
+            phone: '',
+            email: '',
+            whatsapp: '',
+            preferredContact: '' 
+          },
+          images: []
+        });
+      }
     } catch (error) {
       console.error('Error creating post:', error);
+      toast.error("Failed to create post");
     } finally {
       setIsSubmitting(false);
     }
@@ -142,7 +242,7 @@ const CreateRoommatePost = () => {
       </div>
 
       <div className="max-w-4xl mx-auto px-4 py-8">
-        <form onSubmit={handleSubmit} className="space-y-8">
+        <div className="space-y-8">
           
           {/* Basic Information */}
           <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
@@ -154,33 +254,37 @@ const CreateRoommatePost = () => {
             <div className="space-y-6">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Post Title *
+                  Post Title * <span className="text-xs text-gray-500">(Max 100 characters)</span>
                 </label>
                 <input
                   type="text"
                   value={formData.title}
                   onChange={(e) => handleInputChange(null, 'title', e.target.value)}
                   placeholder="e.g., Final year student looking for female roommate near MUJ"
+                  maxLength="100"
                   className={`w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent ${
                     errors.title ? 'border-red-500' : 'border-gray-300'
                   }`}
                 />
+                <div className="text-xs text-gray-400 mt-1">{formData.title.length}/100</div>
                 {errors.title && <p className="text-red-500 text-sm mt-1">{errors.title}</p>}
               </div>
 
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Description *
+                  Description * <span className="text-xs text-gray-500">(Max 1000 characters)</span>
                 </label>
                 <textarea
                   value={formData.description}
                   onChange={(e) => handleInputChange(null, 'description', e.target.value)}
                   placeholder="Tell us about yourself, your lifestyle, and what you're looking for in a roommate..."
                   rows="4"
+                  maxLength="1000"
                   className={`w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent ${
                     errors.description ? 'border-red-500' : 'border-gray-300'
                   }`}
                 />
+                <div className="text-xs text-gray-400 mt-1">{formData.description.length}/1000</div>
                 {errors.description && <p className="text-red-500 text-sm mt-1">{errors.description}</p>}
               </div>
             </div>
@@ -314,28 +418,38 @@ const CreateRoommatePost = () => {
 
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Age Range (Min)
+                    Age Range (Min) <span className="text-xs text-gray-500">(18-35)</span>
                   </label>
                   <input
                     type="number"
+                    min="18"
+                    max="35"
                     value={formData.preferences.ageRange.min}
                     onChange={(e) => handleInputChange('preferences', 'ageRange', {...formData.preferences.ageRange, min: e.target.value})}
                     placeholder="18"
-                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                    className={`w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent ${
+                      errors.ageMin ? 'border-red-500' : 'border-gray-300'
+                    }`}
                   />
+                  {errors.ageMin && <p className="text-red-500 text-sm mt-1">{errors.ageMin}</p>}
                 </div>
 
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Age Range (Max)
+                    Age Range (Max) <span className="text-xs text-gray-500">(18-35)</span>
                   </label>
                   <input
                     type="number"
+                    min="18"
+                    max="35"
                     value={formData.preferences.ageRange.max}
                     onChange={(e) => handleInputChange('preferences', 'ageRange', {...formData.preferences.ageRange, max: e.target.value})}
                     placeholder="25"
-                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                    className={`w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent ${
+                      errors.ageMax ? 'border-red-500' : 'border-gray-300'
+                    }`}
                   />
+                  {errors.ageMax && <p className="text-red-500 text-sm mt-1">{errors.ageMax}</p>}
                 </div>
               </div>
 
@@ -377,7 +491,7 @@ const CreateRoommatePost = () => {
                 <label className="block text-sm font-medium text-gray-700 mb-3">
                   Preferred Habits & Lifestyle
                 </label>
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
                   {habitOptions.map(habit => (
                     <label key={habit} className="flex items-center space-x-2 cursor-pointer">
                       <input
@@ -443,7 +557,7 @@ const CreateRoommatePost = () => {
               <label className="block text-sm font-medium text-gray-700 mb-3">
                 Desired Amenities
               </label>
-              <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
                 {amenityOptions.map(amenity => (
                   <label key={amenity} className="flex items-center space-x-2 cursor-pointer">
                     <input
@@ -471,13 +585,31 @@ const CreateRoommatePost = () => {
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Phone Number *
+                  Your Name *
+                </label>
+                <input
+                  type="text"
+                  value={formData.contact.name}
+                  onChange={(e) => handleInputChange('contact', 'name', e.target.value)}
+                  placeholder="Your full name"
+                  maxLength="50"
+                  className={`w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent ${
+                    errors.name ? 'border-red-500' : 'border-gray-300'
+                  }`}
+                />
+                <div className="text-xs text-gray-400 mt-1">{formData.contact.name.length}/50</div>
+                {errors.name && <p className="text-red-500 text-sm mt-1">{errors.name}</p>}
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Phone Number * <span className="text-xs text-gray-500">(10 digits starting with 6-9)</span>
                 </label>
                 <input
                   type="tel"
                   value={formData.contact.phone}
                   onChange={(e) => handleInputChange('contact', 'phone', e.target.value)}
-                  placeholder="+91 9876543210"
+                  placeholder="9876543210"
                   className={`w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent ${
                     errors.phone ? 'border-red-500' : 'border-gray-300'
                   }`}
@@ -500,39 +632,34 @@ const CreateRoommatePost = () => {
 
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
-                  WhatsApp Number
+                  WhatsApp Number <span className="text-xs text-gray-500">(10 digits starting with 6-9)</span>
                 </label>
                 <input
                   type="tel"
                   value={formData.contact.whatsapp}
                   onChange={(e) => handleInputChange('contact', 'whatsapp', e.target.value)}
-                  placeholder="+91 9876543210"
+                  placeholder="9876543210"
                   className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
                 />
               </div>
 
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-3">
-                  Preferred Contact Methods *
+                  Preferred Contact Method *
                 </label>
-                <div className="space-y-2">
-                  {[
-                    { value: 'phone', label: 'Phone Call', icon: Phone },
-                    { value: 'email', label: 'Email', icon: Mail },
-                    { value: 'whatsapp', label: 'WhatsApp', icon: MessageCircle }
-                  ].map(method => (
-                    <label key={method.value} className="flex items-center space-x-2 cursor-pointer">
-                      <input
-                        type="checkbox"
-                        checked={formData.contact.preferredContact.includes(method.value)}
-                        onChange={() => handleArrayToggle('contact', 'preferredContact', method.value)}
-                        className="w-4 h-4 text-purple-600 border-gray-300 rounded focus:ring-purple-500"
-                      />
-                      <method.icon className="w-4 h-4 text-gray-500" />
-                      <span className="text-sm text-gray-700">{method.label}</span>
-                    </label>
-                  ))}
-                </div>
+                <select
+                  value={formData.contact.preferredContact}
+                  onChange={(e) => handleInputChange('contact', 'preferredContact', e.target.value)}
+                  className={`w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent ${
+                    errors.contact ? 'border-red-500' : 'border-gray-300'
+                  }`}
+                >
+                  <option value="">Select method</option>
+                  <option value="phone">Phone Call</option>
+                  <option value="email">Email</option>
+                  <option value="whatsapp">WhatsApp</option>
+                  <option value="in_app_chat">In-App Chat</option>
+                </select>
                 {errors.contact && <p className="text-red-500 text-sm mt-1">{errors.contact}</p>}
               </div>
             </div>
@@ -548,7 +675,8 @@ const CreateRoommatePost = () => {
               Cancel
             </button>
             <button
-              type="submit"
+              type="button"
+              onClick={handleSubmit}
               disabled={isSubmitting}
               className="px-8 py-3 bg-gradient-to-r from-purple-500 to-pink-500 text-white rounded-xl hover:from-purple-600 hover:to-pink-600 transition-colors font-medium disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center"
             >
@@ -565,7 +693,7 @@ const CreateRoommatePost = () => {
               )}
             </button>
           </div>
-        </form>
+        </div>
       </div>
     </div>
   );

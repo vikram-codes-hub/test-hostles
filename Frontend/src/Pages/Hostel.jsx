@@ -16,8 +16,8 @@ const Hostel = () => {
   // State
   const [productdata, setProductdata] = useState(null);
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
-  const [isLiked, setIsLiked] = useState(false); // New state for like status
-  const [isLoadingLike, setIsLoadingLike] = useState(false); // Loading state for like action
+  const [isLiked, setIsLiked] = useState(false); 
+  const [isLoadingLike, setIsLoadingLike] = useState(false);
   
   // Contexts
   const {
@@ -25,7 +25,7 @@ const Hostel = () => {
     addLike,
     removeLike,
     getSingleHostelInfo,
-    checkLikeStatus, // Make sure to add this to your AuthContext
+    checkLikeStatus,
   } = useContext(AuthContext);
   const { initializeChat } = useContext(ChatContext);
 
@@ -49,6 +49,7 @@ const Hostel = () => {
       if (authuser && hostelId) {
         try {
           const liked = await checkLikeStatus(hostelId);
+       
           setIsLiked(liked);
         } catch (error) {
           console.error('Error checking like status:', error);

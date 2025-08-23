@@ -7,16 +7,20 @@ import "./index.css";
 import Hostelscontextprovider from "./Context/Hostelss.jsx";
 import AuthContextProvider from "./Context/auth.jsx";
 import ChatContextProvider from "./Context/Chatcontext.jsx";
+import RoommateProvider from "./Context/Roommate.jsx";
 
 createRoot(document.getElementById("root")).render(
   <React.StrictMode>
     <BrowserRouter>
       <AuthContextProvider>
         <Hostelscontextprovider>
-          <ChatContextProvider>
+          <RoommateProvider>
 
-            <App />
+          <ChatContextProvider>
+             <App />
           </ChatContextProvider>
+          
+          </RoommateProvider>
          
         </Hostelscontextprovider>
       </AuthContextProvider>

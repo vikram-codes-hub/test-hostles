@@ -15,7 +15,7 @@ const ChatContextProvider = ({ children }) => {
   const [unseenMessages, setUnseenMessages] = useState({});
   const [loading, setLoading] = useState(false);
   const [currentChatAdmin, setCurrentChatAdmin] = useState(null);
-  const [chatInfo, setChatInfo] = useState(null); // Added for hostel info
+  const [chatInfo, setChatInfo] = useState(null); 
 
   // Get user role - FIXED: use authuser
   const isAdmin = authuser?.role === "admin";

@@ -18,13 +18,13 @@ const ChatHeader = () => {
     currentChatAdmin,
     startChatWithHostelAdmin,
     loading,
-    getChatDebugInfo // Add this for better debugging
+    getChatDebugInfo 
   } = chatContext || {};
   
   const { 
     authuser,
     selecteduser,
-    setSelectedUser,
+
     token
   } = authContext || {};
 
