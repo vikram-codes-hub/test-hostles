@@ -74,7 +74,7 @@ const RoommateSchema = new mongoose.Schema({
     }
   },
   
-  // Room details (if room_available)
+  // Room details 
   roomDetails: {
     roomType: {
       type: String,
@@ -92,6 +92,7 @@ const RoommateSchema = new mongoose.Schema({
   
   // Contact info
   contact: {
+    name: { type: String, required: true },
     phone: { 
       type: String, 
       required: true,

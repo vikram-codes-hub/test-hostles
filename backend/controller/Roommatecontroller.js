@@ -1,99 +1,346 @@
-
 import mongoose from "mongoose";
 import Roommate from "../modules/Roommate.js";
+import cloudinary from "../config/cloudinary.js";
 
+// Helper function to upload images to Cloudinary
+const uploadImagesToCloudinary = async (images) => {
+  if (!images || !Array.isArray(images) || images.length === 0) {
+    return [];
+  }
+
+  try {
+    // Filter only base64 images
+    const base64Images = images.filter(img => 
+      typeof img === 'string' && img.startsWith('data:image/')
+    );
+
+    if (base64Images.length === 0) {
+      return [];
+    }
+
+    // Limit to 10 images maximum
+    const imagesToUpload = base64Images.slice(0, 10);
+    
+    const uploadPromises = imagesToUpload.map(async (image, index) => {
+      try {
+        const result = await cloudinary.uploader.upload(image, {
+          folder: 'roommate-finder',
+          public_id: `roommate-${Date.now()}-${index}`,
+          resource_type: 'image',
+          // Optimization settings
+          quality: 'auto:good',
+          format: 'webp',
+          transformation: [
+            {
+              width: 1200,
+              height: 800,
+              crop: 'limit'
+            }
+          ]
+        });
+
+        return result.secure_url;
+      } catch (error) {
+        console.error(`Failed to upload image ${index}:`, error);
+        return null;
+      }
+    });
+
+    const uploadResults = await Promise.all(uploadPromises);
+    
+    // Filter out failed uploads
+    return uploadResults.filter(url => url !== null);
+
+  } catch (error) {
+    console.error('Error uploading images to Cloudinary:', error);
+    throw new Error(`Image upload failed: ${error.message}`);
+  }
+};
+
+// Helper function to delete images from Cloudinary
+const deleteImagesFromCloudinary = async (imageUrls) => {
+  if (!imageUrls || !Array.isArray(imageUrls) || imageUrls.length === 0) {
+    return;
+  }
+
+  try {
+    const deletePromises = imageUrls.map(async (url) => {
+      try {
+        // Extract public_id from Cloudinary URL
+        const matches = url.match(/\/roommate-finder\/([^\.]+)/);
+        if (matches && matches[1]) {
+          const publicId = `roommate-finder/${matches[1]}`;
+          await cloudinary.uploader.destroy(publicId);
+        }
+      } catch (error) {
+        console.error('Failed to delete image:', url, error);
+      }
+    });
+
+    await Promise.all(deletePromises);
+  } catch (error) {
+    console.error('Error deleting images from Cloudinary:', error);
+  }
+};
+
+// Helper function to get time ago
+const getTimeAgo = (date) => {
+  const now = new Date();
+  const diffInSeconds = Math.floor((now - new Date(date)) / 1000);
+  
+  if (diffInSeconds < 60) return 'Just now';
+  if (diffInSeconds < 3600) return `${Math.floor(diffInSeconds / 60)} minutes ago`;
+  if (diffInSeconds < 86400) return `${Math.floor(diffInSeconds / 3600)} hours ago`;
+  return `${Math.floor(diffInSeconds / 86400)} days ago`;
+};
 
 // Logic for creating new roommate post
 export const createRoommatePost = async (req, res) => {
- try {
-     const {
-     type,
-     title,
-     description,
-     budget,
-     rent,
-     location,
-     preferences,
-     roomDetails,
-     contact,
-     images
-   } = req.body;
-   const userId = req.user.id || req.user._id;
+  let uploadedImageUrls = [];
+  
+  try {
+    const {
+      type,
+      title,
+      description,
+      budget,
+      rent,
+      location,
+      preferences,
+      roomDetails,
+      contact,
+      images
+    } = req.body;
+    
+    const userId = req.user.id || req.user._id;
 
+    // Basic validation
     if (!type || !title || !description || !location?.area || !location?.city || !contact?.phone) {
-     return res.status(400).json({
-       success: false,
-       message: "Required fields missing: type, title, description, location (area, city), and contact phone"
-     });
-   }
+      return res.status(400).json({
+        success: false,
+        message: "Required fields missing: type, title, description, location (area, city), and contact phone"
+      });
+    }
 
+    // Type-specific validation
     if (type === 'room_available' && !rent) {
-     return res.status(400).json({
-       success: false,
-       message: "Rent is required for room_available posts"
-     });
-   }
+      return res.status(400).json({
+        success: false,
+        message: "Rent is required for room_available posts"
+      });
+    }
 
+    if (type === 'looking_for_roommate' && (!budget?.min && !budget?.max)) {
+      return res.status(400).json({
+        success: false,
+        message: "Budget range is required for looking_for_roommate posts"
+      });
+    }
 
-   if (type === 'looking_for_roommate' && (!budget?.min && !budget?.max)) {
-     return res.status(400).json({
-       success: false,
-       message: "Budget range is required for looking_for_roommate posts"
-     });
-   }
-
-   const existingActivePost=await Roommate.findOne({
-    userId,type,isActive:true,  expiresAt: { $gt: new Date() }
-   })
+    // Check for existing active post
+    const existingActivePost = await Roommate.findOne({
+      userId,
+      type,
+      isActive: true,
+      expiresAt: { $gt: new Date() }
+    });
 
     if (existingActivePost) {
-     return res.status(400).json({
-       success: false,
-       message: `You already have an active ${type.replace('_', ' ')} post. Please deactivate it first.`
-     });
-   }
+      return res.status(400).json({
+        success: false,
+        message: `You already have an active ${type.replace('_', ' ')} post. Please deactivate it first.`
+      });
+    }
+
+    // Upload images to Cloudinary if provided
+    if (images && Array.isArray(images) && images.length > 0) {
+      try {
+        uploadedImageUrls = await uploadImagesToCloudinary(images);
+      } catch (imageError) {
+        return res.status(400).json({
+          success: false,
+          message: imageError.message
+        });
+      }
+    }
+
+    // Create new roommate post
     const newRoommatePost = new Roommate({
-     userId,
-     type,
-     title,
-     description,
-     budget,
-     rent,
-     location,
-     preferences,
-     roomDetails,
-     contact,
-     images: images || []
-   });
+      userId,
+      type,
+      title,
+      description,
+      budget,
+      rent,
+      location,
+      preferences,
+      roomDetails,
+      contact,
+      images: uploadedImageUrls
+    });
 
-   const newpost=await newRoommatePost.save()
-      const populatedPost = await Roommate.findById(newpost._id).populate('userId', 'name email');
+    const savedPost = await newRoommatePost.save();
+    
+    // Populate user details for response
+    const populatedPost = await Roommate.findById(savedPost._id)
+      .populate('userId', 'fullName email');
 
-         res.status(201).json({
-     success: true,
-     message: "Roommate post created successfully",
-     data: populatedPost
-   });
- } catch (error) {
-     console.error("Error creating roommate post:", error);
-   
-   // Handle validation errors
-   if (error.name === 'ValidationError') {
-     const errors = Object.values(error.errors).map(err => err.message);
-     return res.status(400).json({
-       success: false,
-       message: "Validation failed",
-       errors: errors
-     });
-   }
+    res.status(201).json({
+      success: true,
+      message: "Roommate post created successfully",
+      data: populatedPost,
+      imageStats: {
+        totalImagesProvided: images?.length || 0,
+        imagesUploadedSuccessfully: uploadedImageUrls.length
+      }
+    });
 
-   res.status(500).json({
-     success: false,
-     message: "Internal server error",
-     error: error.message
-   });
- }
- 
+  } catch (error) {
+    console.error("Error creating roommate post:", error);
+    
+    // Cleanup uploaded images on error
+    if (uploadedImageUrls.length > 0) {
+      await deleteImagesFromCloudinary(uploadedImageUrls);
+    }
+
+    // Handle validation errors
+    if (error.name === 'ValidationError') {
+      const errors = Object.values(error.errors).map(err => err.message);
+      return res.status(400).json({
+        success: false,
+        message: "Validation failed",
+        errors: errors
+      });
+    }
+
+    res.status(500).json({
+      success: false,
+      message: "Internal server error",
+      error: error.message
+    });
+  }
+};
+
+//logic for fething all the posts
+export const getmyposts= async (req, res) => {
+  try {
+    const userId = req.user.id || req.user._id;
+    const {
+      page = 1,
+      limit = 10,
+      type,
+      status = 'all', // 'all', 'active', 'inactive', 'expired'
+      sortBy = 'createdAt',
+      sortOrder = 'desc'
+    } = req.query;
+    const filter={ userId };
+    if (type && ['looking_for_roommate', 'room_available'].includes(type)) {
+      filter.type = type;
+    }
+
+    //add status filter
+     const currentDate = new Date();
+    switch (status) {
+      case 'active':
+        filter.isActive = true;
+        filter.expiresAt = { $gt: currentDate };
+        break;
+      case 'inactive':
+        filter.isActive = false;
+        break;
+      case 'expired':
+        filter.expiresAt = { $lte: currentDate };
+        break;
+      case 'all':
+      default:
+        // No additional filter for 'all'
+        break;
+    }
+ const skip = (parseInt(page) - 1) * parseInt(limit);
+    const limitNum = parseInt(limit);
+
+    // Sort options
+    const sortOptions = {};
+    sortOptions[sortBy] = sortOrder === 'desc' ? -1 : 1;
+
+    // Execute query
+    const posts = await Roommate.find(filter)
+      .populate('userId', 'fullName email')
+      .populate('interested.userId', 'fullName email')
+      .sort(sortOptions)
+      .skip(skip)
+      .limit(limitNum)
+      .lean();
+
+    // Get total count for pagination
+    const totalPosts = await Roommate.countDocuments(filter);
+    const totalPages = Math.ceil(totalPosts / limitNum);
+
+    // Calculate stats
+    const allUserPosts = await Roommate.find({ userId }).lean();
+    const stats = {
+      totalPosts: allUserPosts.length,
+      activePosts: allUserPosts.filter(post => 
+        post.isActive && new Date(post.expiresAt) > currentDate
+      ).length,
+      inactivePosts: allUserPosts.filter(post => !post.isActive).length,
+      expiredPosts: allUserPosts.filter(post => 
+        new Date(post.expiresAt) <= currentDate
+      ).length,
+      totalViews: allUserPosts.reduce((sum, post) => sum + (post.views || 0), 0),
+      totalInterested: allUserPosts.reduce((sum, post) => 
+        sum + (post.interested ? post.interested.length : 0), 0
+      ),
+      roomAvailablePosts: allUserPosts.filter(post => post.type === 'room_available').length,
+      lookingForRoommatePosts: allUserPosts.filter(post => post.type === 'looking_for_roommate').length
+    };
+
+    // Add calculated fields to posts
+    const postsWithStats = posts.map(post => {
+      const isExpired = new Date(post.expiresAt) <= currentDate;
+      const daysLeft = isExpired ? 0 : Math.ceil((new Date(post.expiresAt) - currentDate) / (24 * 60 * 60 * 1000));
+      
+      return {
+        ...post,
+        isExpired,
+        isExpiringSoon: !isExpired && daysLeft <= 7,
+        daysLeft,
+        interestedCount: post.interested ? post.interested.length : 0,
+        timeAgo: getTimeAgo(post.createdAt),
+        status: isExpired ? 'expired' : (post.isActive ? 'active' : 'inactive')
+      };
+    });
+
+    res.status(200).json({
+      success: true,
+      data: {
+        posts: postsWithStats,
+        stats,
+        pagination: {
+          currentPage: parseInt(page),
+          totalPages,
+          totalPosts,
+          hasNextPage: parseInt(page) < totalPages,
+          hasPrevPage: parseInt(page) > 1,
+          limit: limitNum
+        },
+        filters: {
+          type,
+          status,
+          sortBy,
+          sortOrder
+        }
+      }
+    });
+
+  } catch (error) {
+    console.error("Error getting user's posts:", error);
+    res.status(500).json({
+      success: false,
+      message: "Error retrieving your posts",
+      error: error.message
+    });
+  }
 };
 
 // Logic for getting all roommate posts with pagination
@@ -118,7 +365,7 @@ export const getRoommatePosts = async (req, res) => {
     // Build filter object
     const filter = {
       isActive: true,
-      expiresAt: { $gt: new Date() } // Only active and non-expired posts
+      expiresAt: { $gt: new Date() }
     };
 
     // Add filters based on query parameters
@@ -127,7 +374,7 @@ export const getRoommatePosts = async (req, res) => {
     }
 
     if (city) {
-      filter['location.city'] = { $regex: city, $options: 'i' }; // Case insensitive
+      filter['location.city'] = { $regex: city, $options: 'i' };
     }
 
     if (area) {
@@ -150,7 +397,7 @@ export const getRoommatePosts = async (req, res) => {
       filter['roomDetails.furnishing'] = furnishing;
     }
 
-
+    // Budget filtering
     if (minBudget || maxBudget) {
       const budgetConditions = [];
       
@@ -183,26 +430,27 @@ export const getRoommatePosts = async (req, res) => {
     const sortOptions = {};
     sortOptions[sortBy] = sortOrder === 'desc' ? -1 : 1;
 
-    // Execute query with your exact schema fields
+    // Execute query
     const posts = await Roommate.find(filter)
-      .populate('userId', 'name email phone') // Populate user details
-      .populate('interested.userId', 'name') // Populate interested users
+      .populate('userId', 'fullName email')
+      .populate('interested.userId', 'fullName')
       .sort(sortOptions)
       .skip(skip)
       .limit(limitNum)
-      .lean(); // Use lean() for better performance
+      .lean();
 
     // Get total count for pagination
     const totalPosts = await Roommate.countDocuments(filter);
     const totalPages = Math.ceil(totalPosts / limitNum);
 
-    // Add calculated fields based on your schema
+    // Add calculated fields
     const postsWithStats = posts.map(post => ({
       ...post,
-      isExpiringSoon: new Date(post.expiresAt) - new Date() < 7 * 24 * 60 * 60 * 1000, // Expires in 7 days
+      isExpiringSoon: new Date(post.expiresAt) - new Date() < 7 * 24 * 60 * 60 * 1000,
       daysLeft: Math.ceil((new Date(post.expiresAt) - new Date()) / (24 * 60 * 60 * 1000)),
       interestedCount: post.interested ? post.interested.length : 0,
-      // Hide interested users list from public view (only show count)
+      timeAgo: getTimeAgo(post.createdAt),
+      // Hide interested users list from public view
       interested: undefined
     }));
 
@@ -247,77 +495,84 @@ export const getRoommatePostById = async (req, res) => {
   try {
     const { id } = req.params;
 
-     if (!mongoose.Types.ObjectId.isValid(id)) {
-     return res.status(400).json({
-       success: false,
-       message: "Invalid post ID format"
-     });
-   }
-   const post =await Roommate.findById(id).populate('userId', 'name email phone createdAt').populate('interested.userId', 'name email').lean()
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid post ID format"
+      });
+    }
 
-   if(!post){
-    return res.status(404).json({
-       success: false,
-       message: "Roommate post not found"
-     });
-   }
+    const post = await Roommate.findById(id)
+      .populate('userId', 'fullName email createdAt')
+      .populate('interested.userId', 'fullName email')
+      .lean();
 
-   const isExpired = new Date(post.expiresAt) < new Date();
+    if (!post) {
+      return res.status(404).json({
+        success: false,
+        message: "Roommate post not found"
+      });
+    }
+
+    const isExpired = new Date(post.expiresAt) < new Date();
 
     const postWithStats = {
-     ...post,
-     isExpired,
-     isExpiringSoon: !isExpired && (new Date(post.expiresAt) - new Date() < 7 * 24 * 60 * 60 * 1000),
-     daysLeft: isExpired ? 0 : Math.ceil((new Date(post.expiresAt) - new Date()) / (24 * 60 * 60 * 1000)),
-     interestedCount: post.interested ? post.interested.length : 0,
-     timeAgo: getTimeAgo(post.createdAt)
-   };
+      ...post,
+      isExpired,
+      isExpiringSoon: !isExpired && (new Date(post.expiresAt) - new Date() < 7 * 24 * 60 * 60 * 1000),
+      daysLeft: isExpired ? 0 : Math.ceil((new Date(post.expiresAt) - new Date()) / (24 * 60 * 60 * 1000)),
+      interestedCount: post.interested ? post.interested.length : 0,
+      timeAgo: getTimeAgo(post.createdAt)
+    };
 
-   const userId = req.user?.id || req.user?._id;
-   const isOwner = userId && userId.toString() === post.userId._id.toString();
-   const hasShownInterest = userId && post.interested?.some(interest => 
-     interest.userId._id.toString() === userId.toString()
-   );
+    const userId = req.user?.id || req.user?._id;
+    const isOwner = userId && userId.toString() === post.userId._id.toString();
+    const hasShownInterest = userId && post.interested?.some(interest => 
+      interest.userId._id.toString() === userId.toString()
+    );
 
-   if (!isOwner) {
-     // Hide full contact details for non-owners, show only preferred contact method
-     postWithStats.contact = {
-       preferredContact: post.contact.preferredContact,
-       // Only show contact if user has shown interest or it's public policy
-       ...(hasShownInterest && {
-         phone: post.contact.phone,
-         email: post.contact.email,
-         whatsapp: post.contact.whatsapp
-       })
-     };
-     
-     // Hide detailed interested users list from non-owners
-     postWithStats.interested = undefined;
-   }
+    if (!isOwner) {
+      // Hide full contact details for non-owners
+      postWithStats.contact = {
+        preferredContact: post.contact.preferredContact,
+        ...(hasShownInterest && {
+          phone: post.contact.phone,
+          email: post.contact.email,
+          whatsapp: post.contact.whatsapp
+        })
+      };
+      
+      // Hide detailed interested users list from non-owners
+      postWithStats.interested = undefined;
+    }
+
     res.status(200).json({
-     success: true,
-     data: {
-       post: postWithStats,
-       userRelation: {
-         isOwner,
-         hasShownInterest: hasShownInterest || false,
-         canContact: isOwner || hasShownInterest
-       }
-     }
-   });
+      success: true,
+      data: {
+        post: postWithStats,
+        userRelation: {
+          isOwner,
+          hasShownInterest: hasShownInterest || false,
+          canContact: isOwner || hasShownInterest
+        }
+      }
+    });
    
   } catch (error) {
-   console.error("Error getting roommate post by ID:", error);
-   res.status(500).json({
-     success: false,
-     message: "Internal server error",
-     error: error.message
-   });
- }
+    console.error("Error getting roommate post by ID:", error);
+    res.status(500).json({
+      success: false,
+      message: "Internal server error",
+      error: error.message
+    });
+  }
 };
 
 // Logic for updating roommate post
 export const updateRoommatePost = async (req, res) => {
+  let newlyUploadedImages = [];
+  let oldImages = [];
+  
   try {
     const { id } = req.params;
     const {
@@ -359,7 +614,10 @@ export const updateRoommatePost = async (req, res) => {
       });
     }
 
-    // Prepare update object - ONLY include fields that are provided
+    // Store old images for cleanup if needed
+    oldImages = existingPost.images || [];
+
+    // Prepare update object
     const updateData = {
       updatedAt: new Date()
     };
@@ -374,9 +632,26 @@ export const updateRoommatePost = async (req, res) => {
     if (preferences !== undefined) updateData.preferences = preferences;
     if (roomDetails !== undefined) updateData.roomDetails = roomDetails;
     if (contact !== undefined) updateData.contact = contact;
-    if (images !== undefined) updateData.images = images;
 
-    // Validate required fields only if they're being updated
+    // Handle images update
+    if (images !== undefined) {
+      if (Array.isArray(images) && images.length > 0) {
+        // Upload new images to Cloudinary
+        try {
+          newlyUploadedImages = await uploadImagesToCloudinary(images);
+          updateData.images = newlyUploadedImages;
+        } catch (imageError) {
+          return res.status(400).json({
+            success: false,
+            message: imageError.message
+          });
+        }
+      } else {
+        updateData.images = [];
+      }
+    }
+
+    // Validate required fields
     const finalType = type || existingPost.type;
     const finalTitle = title || existingPost.title;
     const finalDescription = description || existingPost.description;
@@ -384,6 +659,10 @@ export const updateRoommatePost = async (req, res) => {
     const finalContact = contact || existingPost.contact;
 
     if (!finalType || !finalTitle || !finalDescription || !finalLocation?.area || !finalLocation?.city || !finalContact?.phone) {
+      // Cleanup newly uploaded images if validation fails
+      if (newlyUploadedImages.length > 0) {
+        await deleteImagesFromCloudinary(newlyUploadedImages);
+      }
       return res.status(400).json({
         success: false,
         message: "Cannot remove required fields: type, title, description, location (area, city), and contact phone"
@@ -395,6 +674,9 @@ export const updateRoommatePost = async (req, res) => {
     const finalBudget = budget !== undefined ? budget : existingPost.budget;
 
     if (finalType === 'room_available' && !finalRent) {
+      if (newlyUploadedImages.length > 0) {
+        await deleteImagesFromCloudinary(newlyUploadedImages);
+      }
       return res.status(400).json({
         success: false,
         message: "Rent is required for room_available posts"
@@ -402,6 +684,9 @@ export const updateRoommatePost = async (req, res) => {
     }
 
     if (finalType === 'looking_for_roommate' && (!finalBudget?.min && !finalBudget?.max)) {
+      if (newlyUploadedImages.length > 0) {
+        await deleteImagesFromCloudinary(newlyUploadedImages);
+      }
       return res.status(400).json({
         success: false,
         message: "Budget range is required for looking_for_roommate posts"
@@ -420,6 +705,9 @@ export const updateRoommatePost = async (req, res) => {
       });
 
       if (duplicatePost) {
+        if (newlyUploadedImages.length > 0) {
+          await deleteImagesFromCloudinary(newlyUploadedImages);
+        }
         return res.status(400).json({
           success: false,
           message: `You already have an active ${type.replace('_', ' ')} post. Please deactivate it first.`
@@ -427,7 +715,7 @@ export const updateRoommatePost = async (req, res) => {
       }
     }
 
-    // Update the post (only provided fields)
+    // Update the post
     const updatedPost = await Roommate.findByIdAndUpdate(
       id,
       updateData,
@@ -435,16 +723,30 @@ export const updateRoommatePost = async (req, res) => {
         new: true,
         runValidators: true
       }
-    ).populate('userId', 'name email phone');
+    ).populate('userId', 'fullName email');
+
+    // Delete old images from Cloudinary if images were updated
+    if (images !== undefined && oldImages.length > 0) {
+      await deleteImagesFromCloudinary(oldImages);
+    }
 
     res.status(200).json({
       success: true,
       message: "Roommate post updated successfully",
-      data: updatedPost
+      data: updatedPost,
+      imageStats: {
+        oldImagesDeleted: images !== undefined ? oldImages.length : 0,
+        newImagesUploaded: newlyUploadedImages.length
+      }
     });
 
   } catch (error) {
     console.error("Error updating roommate post:", error);
+    
+    // Cleanup newly uploaded images on error
+    if (newlyUploadedImages.length > 0) {
+      await deleteImagesFromCloudinary(newlyUploadedImages);
+    }
     
     if (error.name === 'ValidationError') {
       const errors = Object.values(error.errors).map(err => err.message);
@@ -462,6 +764,7 @@ export const updateRoommatePost = async (req, res) => {
     });
   }
 };
+
 // Logic for deleting roommate post
 export const deleteRoommatePost = async (req, res) => {
   try {
@@ -475,23 +778,30 @@ export const deleteRoommatePost = async (req, res) => {
       });
     }
 
-    // Find and delete the post
-    const deletedPost = await Roommate.findByIdAndDelete(id);
+    // Find the post first to get images for cleanup
+    const postToDelete = await Roommate.findById(id);
 
-    // Check if post existed
-    if (!deletedPost) {
+    if (!postToDelete) {
       return res.status(404).json({
         success: false,
         message: "Roommate post not found"
       });
     }
 
+    // Delete images from Cloudinary
+    if (postToDelete.images && postToDelete.images.length > 0) {
+      await deleteImagesFromCloudinary(postToDelete.images);
+    }
+
+    // Delete the post from database
+    const deletedPost = await Roommate.findByIdAndDelete(id);
+
     res.status(200).json({
       success: true,
       message: "Roommate post deleted successfully",
       data: {
         deletedPostId: id,
-        deletedPost: deletedPost
+        imagesDeleted: postToDelete.images?.length || 0
       }
     });
 
@@ -522,9 +832,9 @@ export const getUserRoommatePosts = async (req, res) => {
       isActive: true, 
       expiresAt: { $gt: new Date() } 
     })
-      .populate('userId', 'name email phone')
-      .populate('interested.userId', 'name email')
-      .sort({ createdAt: -1 }) // Sort by creation date, most recent first
+      .populate('userId', 'fullName email')
+      .populate('interested.userId', 'fullName email')
+      .sort({ createdAt: -1 })
       .lean();
 
     if (posts.length === 0) {
@@ -556,7 +866,7 @@ export const getUserRoommatePosts = async (req, res) => {
       data: {
         posts: postsWithStats,
         totalPosts: posts.length,
-        user: posts[0]?.userId // User details from first post
+        user: posts[0]?.userId
       }
     });
 
@@ -569,7 +879,6 @@ export const getUserRoommatePosts = async (req, res) => {
     });
   }
 };
-
 
 // Logic for showing interest in a post
 export const showInterestInPost = async (req, res) => {
@@ -593,6 +902,7 @@ export const showInterestInPost = async (req, res) => {
         message: "Roommate post not found"
       });
     }
+
     // Check if post is active and not expired
     if (!post.isActive || new Date(post.expiresAt) < new Date()) {
       return res.status(400).json({
@@ -628,12 +938,12 @@ export const showInterestInPost = async (req, res) => {
     });
 
     // Save the updated post
-      const updatedPost = await post.save();
+    const updatedPost = await post.save();
 
     // Populate the updated post for response
     const populatedPost = await Roommate.findById(updatedPost._id)
-      .populate('userId', 'name email phone')
-      .populate('interested.userId', 'name email');
+      .populate('userId', 'fullName email')
+      .populate('interested.userId', 'fullName email');
 
     res.status(200).json({
       success: true,
@@ -664,6 +974,7 @@ export const getInterestedUsers = async (req, res) => {
   try {
     const { id } = req.params;
     const userId = req.user.id || req.user._id;
+
     // Validate ObjectId format
     if (!mongoose.Types.ObjectId.isValid(id)) {
       return res.status(400).json({
@@ -672,10 +983,10 @@ export const getInterestedUsers = async (req, res) => {
       });
     }
 
-     // Find the post with interested users populated
+    // Find the post with interested users populated
     const post = await Roommate.findById(id)
-      .populate('userId', 'name email phone')
-      .populate('interested.userId', 'name email phone createdAt');
+      .populate('userId', 'fullName email')
+      .populate('interested.userId', 'fullName email createdAt');
 
     if (!post) {
       return res.status(404).json({
@@ -692,7 +1003,7 @@ export const getInterestedUsers = async (req, res) => {
       });
     }
 
-   // Check if the current user is the owner of the post
+    // Check if the current user is the owner of the post
     const isOwner = post.userId._id.toString() === userId.toString();
 
     if (!isOwner) {
@@ -701,14 +1012,16 @@ export const getInterestedUsers = async (req, res) => {
         message: "You are not authorized to view interested users for this post"
       });
     }
+
     // Return interested users only if the user is the owner
     const interestedUsers = post.interested.map(interest => ({
       userId: interest.userId._id,
-      name: interest.userId.name,
+      fullName: interest.userId.fullName,
       email: interest.userId.email,
-      phone: interest.userId.phone,
-      interestedAt: interest.interestedAt
+      interestedAt: interest.interestedAt,
+      timeAgo: getTimeAgo(interest.interestedAt)
     }));
+
     res.status(200).json({
       success: true,
       data: {
@@ -716,7 +1029,7 @@ export const getInterestedUsers = async (req, res) => {
         interestedCount: interestedUsers.length,
         interestedUsers
       }
-    })  ;
+    });
   
   } catch (error) {
     console.error("Error getting interested users:", error);
@@ -779,8 +1092,8 @@ export const removeInterestFromPost = async (req, res) => {
 
     // Populate the updated post for response
     const populatedPost = await Roommate.findById(updatedPost._id)
-      .populate('userId', 'name email phone')
-      .populate('interested.userId', 'name email');
+      .populate('userId', 'fullName email')
+      .populate('interested.userId', 'fullName email');
 
     res.status(200).json({
       success: true,

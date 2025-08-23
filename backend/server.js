@@ -12,6 +12,8 @@ import LikeRoute from './routes/Likeroute.js'
 import MessageRoute from './routes/Messageroute.js'
 import AdminRoute from './routes/adminroute.js'
 import roommaterfinder from './routes/Roommate.js'
+import roommateChatRouter from './routes/Roommatechat.js'
+
 
 
 const app=express()
@@ -82,6 +84,8 @@ app.use('/api/likes',LikeRoute);
 app.use('/api/message',MessageRoute)
 //roommate routes
 app.use('/api/roommate',roommaterfinder)
+//rommatechat route
+app.use('/api/roommatechat',roommateChatRouter)
 
 
 
