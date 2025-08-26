@@ -5,7 +5,7 @@ import { AuthContext } from "./auth";
 export const Roommatecontext = createContext();
 
 const RoommateProvider = ({ children }) => {
-  const { axios, token } = useContext(AuthContext);
+   const { axios, socket, selecteduser: selectedUser, setSelectedUser, token, authuser } = useContext(AuthContext); 
 
   // Create Roommate Post with Image Upload Support
   const CreateRoommatepost = async (formData) => {
@@ -308,7 +308,149 @@ const RoommateProvider = ({ children }) => {
     }
   };
 
+  // ===== CHAT FUNCTIONS =====
+
+  // Send message to selected user
+  const sendMessageToSelectedUser = async (receiverId, message) => {
+    try {
+      if (!authuser) {
+        toast.error("Please login to send messages");
+        return null;
+      }
+
+      if (!receiverId || !message?.trim()) {
+        toast.error("Receiver and message are required");
+        return null;
+      }
+
+      const res = await axios.post("/api/roommate-chat/send", {
+        receiverId,
+        message: message.trim()
+      }, {
+        headers: { Authorization: token },
+      });
+
+      if (res.data.success) {
+        // Don't show success toast for messages to avoid spam
+        return res.data.message;
+      } else {
+        toast.error(res.data.mssg || "Failed to send message");
+        return null;
+      }
+    } catch (error) {
+      console.error("Error sending roommate message:", error);
+      toast.error(error.response?.data?.mssg || "Failed to send message");
+      return null;
+    }
+  };
+
+  // Fetch messages with selected user
+  const getMessagesWithSelectedUser = useCallback(async (userId) => {
+    try {
+      if (!authuser) {
+        toast.error("Please login to view messages");
+        return [];
+      }
+
+      if (!userId) {
+        toast.error("User ID is required");
+        return [];
+      }
+
+      const res = await axios.get(`/api/roommate-chat/messages/${userId}`, {
+        headers: { Authorization: token },
+      });
+
+      if (res.data.success) {
+        return res.data.messages || [];
+      } else {
+        toast.error(res.data.mssg || "Failed to fetch messages");
+        return [];
+      }
+    } catch (error) {
+      console.error("Error fetching roommate messages:", error);
+      toast.error(error.response?.data?.mssg || "Failed to fetch messages");
+      return [];
+    }
+  }, [axios, token, authuser]);
+
+  // Mark messages as read
+  const markRoommateMessagesSeen = async (userId) => {
+    try {
+      if (!authuser) {
+        toast.error("Please login to mark messages as seen");
+        return null;
+      }
+
+      if (!userId) {
+        toast.error("User ID is required");
+        return null;
+      }
+
+      const res = await axios.put(`/api/roommate-chat/messages/${userId}/seen`, {}, {
+        headers: { Authorization: token },
+      });
+
+      if (res.data.success) {
+        // Optional: show success message
+        // toast.success(`${res.data.modifiedCount} messages marked as seen`);
+        return res.data;
+      } else {
+        toast.error(res.data.mssg || "Failed to mark messages as seen");
+        return null;
+      }
+    } catch (error) {
+      console.error("Error marking roommate messages as seen:", error);
+      toast.error(error.response?.data?.mssg || "Failed to mark messages as seen");
+      return null;
+    }
+  };
+
+  // Initialize chat with a user
+  const initializeChat = async (userId) => {
+    try {
+      if (!authuser) {
+        toast.error("Please login to start chatting");
+        return false;
+      }
+
+      if (!userId) {
+        toast.error("User ID is required to start chat");
+        return false;
+      }
+
+      // Set the selected user for chat
+      if (setSelectedUser) {
+        setSelectedUser({ _id: userId });
+      }
+
+      return true;
+    } catch (error) {
+      console.error("Error initializing chat:", error);
+      toast.error("Failed to initialize chat");
+      return false;
+    }
+  };
+
+  // Helper function to get latest message with a user
+  const getLatestMessageWith = useCallback(async (userId) => {
+    try {
+      if (!authuser || !userId) return null;
+
+      const messages = await getMessagesWithSelectedUser(userId);
+      
+      if (messages.length === 0) return null;
+
+      // Return the latest message
+      return messages[messages.length - 1];
+    } catch (error) {
+      console.error("Error getting latest message:", error);
+      return null;
+    }
+  }, [getMessagesWithSelectedUser, authuser]);
+
   const value = {
+    // Post functions
     CreateRoommatepost,
     getRoommatePosts,
     GetRoommatepostbyid,
@@ -319,10 +461,18 @@ const RoommateProvider = ({ children }) => {
     showInterestInPost,
     removeInterest,
     getAllInterestedUsers,
+    getMyPosts,
+    
     // Helper functions for image handling
     fileToBase64,
     filesToBase64,
-    getMyPosts
+    
+    // Chat functions
+    sendMessageToSelectedUser,
+    getMessagesWithSelectedUser,
+    markRoommateMessagesSeen,
+    initializeChat,
+    getLatestMessageWith
   };
 
   return (

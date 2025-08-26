@@ -29,7 +29,7 @@ const ChatContextProvider = ({ children }) => {
     }
   }, [isAdmin, authuser?.id, authuser?._id]);
 
-  // NEW: Initialize chat from hostel page (this is what you need!)
+  // NEW: Initialize chat from hostel page 
   const initializeChat = ({ adminId, userId, hostelInfo }) => {
     if (!authuser) {
       toast.error("Please login to start chatting");

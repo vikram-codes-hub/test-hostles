@@ -87,7 +87,7 @@ const Roommateidpost = () => {
 
       
       const response = await GetRoommatepostbyid(id);
-      console.log('Fetched post response:', response);
+      // console.log('Fetched post response:', response);
  
       
       // FIXED: More flexible response handling
@@ -189,43 +189,49 @@ const Roommateidpost = () => {
     setShowMessageOptions(false);
   };
 
-  const handleInAppChat = async () => {
-    if (!currentUser) {
-      toast.error('Please login to start a chat');
-      navigate('/login');
-      return;
-    }
+// Replace your handleInAppChat function with this corrected version:
 
-    // Check if user is trying to chat with themselves
-    if (isOwner) {
-      toast.error('You cannot start a chat with yourself');
-      return;
-    }
+const handleInAppChat = async () => {
+  if (!currentUser) {
+    toast.error('Please login to start a chat');
+    navigate('/login');
+    return;
+  }
 
-    try {
-      setChatLoading(true);
-      // Check if conversation already exists
-      const existingConversation = await getConversation(currentUser.id || currentUser._id, post.user.id || post.user._id);
-      
-      if (existingConversation) {
-        setConversation(existingConversation);
-      } else {
-        // Create new conversation
-        const newConversation = await createConversation(post.user.id || post.user._id);
-        setConversation(newConversation);
-      }
-      
+  // Check if user is trying to chat with themselves
+  if (isOwner) {
+    toast.error('You cannot start a chat with yourself');
+    return;
+  }
+
+  // Get the correct user ID from the post
+  const postOwnerId = post.userId?._id || post.userId || post.user?._id || post.user?.id;
+  
+  if (!postOwnerId) {
+    toast.error('Unable to identify post owner');
+    return;
+  }
+
+  try {
+    setChatLoading(true);
+    
+    // Since you don't have getConversation and createConversation functions in your context,
+    // let's use the initializeChat function from your context instead
+    const success = await initializeChat(postOwnerId);
+    
+    if (success) {
       setShowMessageOptions(false);
-      setShowChatModal(true);
-      setChatMessage(`Hi! I'm interested in your roommate post: "${post.title || 'Roommate Post'}". Is it still available?`);
-    } catch (err) {
-      console.error('Error starting chat:', err);
-      toast.error('Failed to start chat. Please try again.');
-    } finally {
-      setChatLoading(false);
+      // Navigate to chat page instead of showing modal
+      navigate('/chat-app');
+      toast.success('Chat initialized successfully');
     }
-  };
-
+  } catch (err) {
+    console.error('Error starting chat:', err);
+    toast.error('Failed to start chat. Please try again.');
+  } finally {
+    setChatLoading(false);
+  }
+};
   const handleSendMessage = async () => {
     if (!chatMessage.trim() || chatLoading) return;
 
@@ -399,9 +405,9 @@ const Roommateidpost = () => {
 
   // FIXED: Simplified and more reliable owner check
   const isOwner = currentUser?._id === post?.userId?._id;
-  console.log('Is current user the owner?', isOwner);
-  console.log('Current user ID:', currentUser?._id);
-  console.log('Post user ID:', post?.userId?._id);
+  // console.log('Is current user the owner?', isOwner);
+  // console.log('Current user ID:', currentUser?._id);
+  // console.log('Post user ID:', post?.userId?._id);
  
   
   const hasImages = post.images && Array.isArray(post.images) && post.images.length > 0;

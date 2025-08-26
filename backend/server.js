@@ -85,7 +85,7 @@ app.use('/api/message',MessageRoute)
 //roommate routes
 app.use('/api/roommate',roommaterfinder)
 //rommatechat route
-app.use('/api/roommatechat',roommateChatRouter)
+app.use('/api/roommate-chat',roommateChatRouter)
 
 
 
